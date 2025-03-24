@@ -4,15 +4,20 @@
 #include "i2c/i2c_drv/i2c_common.h"
 #include <time.h>
 
+
+/**
+ * global functions
+ */
+esp_err_t I2C1_init(void);
+
 extern QueueHandle_t i2c_App_queue;
-extern time_t init_time;
+
 
 struct Datos_I2c{
     float presion;
     float flujo;
     float tempFlujo;
 };
-
 
 void i2c_app(void *pvParameters);
 void i2c_app_read(void);

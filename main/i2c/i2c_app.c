@@ -14,38 +14,50 @@ i2c_master_bus_config_t i2c1_bus_conf = {
 };
 
 i2c_master_dev_handle_t ds_handle;
+
 /*
  *@brief I2C1 master initialization
+ *       also init rtc ds1338 and system time
  */
 esp_err_t I2C1_init(void)
 {
     esp_err_t ret;
     ret = i2c_new_master_bus(&i2c1_bus_conf, &I2C1_bus_handle);
-    #ifdef DEBUG
-        ESP_LOGI(TAG, "init i2c %s", ret == ESP_OK ? "success" : "failed");
-    #endif
+
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    ret = i2c_ds1338_init();
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    ret = update_system_time_from_ds1338();
+    if (ret != ESP_OK) {
+        return ret;
+    }   
+
     return ret;
 }
+
 
 // var maquina estados
 i2c_stetes_t i2c_state = st_init;
 
 uint16_t adc=0;
 float offsetPresion = 0;
-time_t init_time=0;
 
+
+/**
+ * task for sample i2c devices
+ */
 void i2c_app(void *pvParameters)
 {
     esp_err_t ret;
     struct Datos_I2c datos;
     float sdppresiondiff = 0;
     float sdptemperatura = 0;
-
-    (void)I2C1_init();
-
-    //init and read rtc
-    (void)i2c_ds1338_init();
-    (void)i2c_ds1338_read(&init_time);
 
     //init sdp810
     if(ESP_OK !=xSdp810Init())
@@ -123,10 +135,6 @@ void i2c_app(void *pvParameters)
             default:
             break;
         }
-
-
-
-      
 
     }
 }

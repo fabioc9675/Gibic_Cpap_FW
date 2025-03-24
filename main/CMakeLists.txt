@@ -1,8 +1,9 @@
 idf_component_register(SRCS "main.c" 
-                            "control.c"
+                            "control/control.c"
                             "uSD/usdDrv.c" 
                             "uSD/usdApp.c" 
                             "wifi/wifiDrv.c"
+                            "wifi/wifiserver.c"
                             "mqtt/mqtt.c"
                             "i2c/i2c_drv/ads1015.c"
                             "i2c/i2c_drv/ds1338.c"
@@ -10,4 +11,5 @@ idf_component_register(SRCS "main.c"
                             "i2c/i2c_app.c"
                             "bldc/bldc_servo.c"
                             "uart/uartapp.c"
-                        INCLUDE_DIRS ".")
+                        INCLUDE_DIRS "."
+                        EMBED_FILES "wifi/favicon.ico" "wifi/upload_script.html")

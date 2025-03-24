@@ -111,7 +111,7 @@ void saveData()
         if (checkSequence())
         {
             //ESP_LOGI(TAG, "Comunicacion confirmada!");
-            ESP_LOGI(TAG, "Brillo: %d, presion: %d, presionAct: %d,tiempo: %d, humedad: %d, fugas: %d, running: %d", brillo, presion, presionAct, tiempo, humedad, fugas, running);
+            //ESP_LOGI(TAG, "Brillo: %d, presion: %d, presionAct: %d,tiempo: %d, humedad: %d, fugas: %d, running: %d", brillo, presion, presionAct, tiempo, humedad, fugas, running);
                 
         }
     }
@@ -123,7 +123,7 @@ void saveData()
 bool checkSequence()
 {
     struct uartDataIn datos;//Almamcena los datos a poner en la cola de salida en caso de recibir de la pantalla
-    ESP_LOGI(TAG, "Secuencia recibida: %02x", buffer[3]);
+    //ESP_LOGI(TAG, "Secuencia recibida: %02x", buffer[3]);
     if (buffer[3] == 0x82)
     { // Secuencia despues de escribir
         for (int i = 0; i < ACK_LENGTH; i++)
@@ -255,6 +255,6 @@ void initScreen()
     initData[15] = humedad;
 
     uart_write_bytes(uart_num, (const char *)initData, sizeof(initData));
-    ESP_LOGI(TAG, "send data");
+    //ESP_LOGI(TAG, "send data");
     seqLength = ACK_LENGTH;
 }

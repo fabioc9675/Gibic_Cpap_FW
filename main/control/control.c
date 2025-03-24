@@ -2,9 +2,9 @@
 
 
 // Constantes del control PID
-#define KP 62.5  // Ganancia proporcional
-#define KI 100  // Ganancia integral
-#define KD 10 // Ganancia derivativa
+#define KP 150  // Ganancia proporcional
+#define KI 2000  // Ganancia integral
+#define KD 30.4 // Ganancia derivativa
 
 // Constantes y parámetros
 #define PRESION_MINIMA 4.0    // Presión mínima de tratamiento (cmH2O)

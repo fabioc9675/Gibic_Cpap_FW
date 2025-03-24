@@ -53,18 +53,17 @@ esp_err_t I2C1_init(void);
  */
 
 /**
- * typedef for DS1338 config and handle
+ * typedef for DS1338 config, handle and buffer
  */
 typedef struct {
-    i2c_device_config_t conf;         /*!< conf device for eeprom device */
-    i2c_master_dev_handle_t handle;   /*!< I2C device handle */
-    uint8_t addr;                     /*!< read address */
-    uint8_t dl_addr;                  /*!< len add to read */
-    uint8_t dl_r;                     /*!< len buf read */
-    uint8_t *buff;                    /*!< buffer for r/w */
-    uint8_t wt_ms;                    /*!< timeout for r/w */
+  i2c_device_config_t conf;         /*!< conf device for eeprom device */
+  i2c_master_dev_handle_t handle;   /*!< I2C device handle */
+  uint8_t *buff;                    /*!< buffer data exchange */
+  uint8_t dl_addr;                  /*!< len add to read */
+  uint8_t dl_r;                     /*!< len buf read */
+  uint8_t wt_ms;                    /*!< timeout for r/w */
 } i2c_ds1338_config_t;
-
+ 
 /**
  * @brief Init an ds1338.
  * @param None
@@ -73,15 +72,17 @@ typedef struct {
 esp_err_t i2c_ds1338_init(void);
 
 /**
- * @brief Read time from DS1338
- * @param[out] time time_t pointer
+ * @brief Read time from DS1338 and update system time.
  * @return ESP_OK: Read success. Otherwise failed, please check I2C function fail reason.
  */
-esp_err_t i2c_ds1338_read(time_t *time);
+esp_err_t update_system_time_from_ds1338(void);
 
 /**
- * todo: write time to DS1338
+ * @brief Write the given system time to the DS1338 RTC.
+ * @param time_ptr Pointer to the time (time_t) to write.
+ * @return ESP_OK: Write success. Otherwise failed, please check I2C function fail reason.
  */
+esp_err_t ds1338_sync(void);
 
 
 /**************************************************************************

@@ -6,6 +6,7 @@
 #include <time.h>
 #include <sys/unistd.h>
 #include <sys/stat.h>
+#include <errno.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 

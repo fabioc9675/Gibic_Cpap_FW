@@ -148,68 +148,68 @@ void send_mqtt_message(char *topic, char *message)
 void MSmqtt(){
     esp_err_t err = ESP_FAIL;
 
-    switch(mqtt_state)
-    {
-        case stConnectWifi:
-            ESP_LOGI(TAG, "stConnectWifi");
-            err = wifi_connect (ssid, pwdSsid);
-            if(err == ESP_OK){
-                mqtt_state = stConnectMqtt;
-                //wifi_get_mac (mac,1)
-                //mac = "000004";
-            }
-            break;
+    // switch(mqtt_state)
+    // {
+    //     case stConnectWifi:
+    //         ESP_LOGI(TAG, "stConnectWifi");
+    //         err = wifi_connect (ssid, pwdSsid);
+    //         if(err == ESP_OK){
+    //             mqtt_state = stConnectMqtt;
+    //             //wifi_get_mac (mac,1)
+    //             //mac = "000004";
+    //         }
+    //         break;
         
-        case stReconnectWifi:
-            err = wifi_reconnect();
-            if(err == ESP_OK){
-                mqtt_state = stConnectMqtt;
-            }
-            break;
+    //     case stReconnectWifi:
+    //         err = wifi_reconnect();
+    //         if(err == ESP_OK){
+    //             mqtt_state = stConnectMqtt;
+    //         }
+    //         break;
 
-        case stConnectMqtt:
-            err = mqtt_app_start(brokerAddress, portBroker);
-            if(err == ESP_OK){
-                mqtt_state = stSendInit;
-            }//else{
-               // mqtt_state = stConnectWifi; 
-            //}
-            ESP_LOGI(TAG, "stConnectMqtt");
-            //flsendmqtt = 1;
-            break;
+    //     case stConnectMqtt:
+    //         err = mqtt_app_start(brokerAddress, portBroker);
+    //         if(err == ESP_OK){
+    //             mqtt_state = stSendInit;
+    //         }//else{
+    //            // mqtt_state = stConnectWifi; 
+    //         //}
+    //         ESP_LOGI(TAG, "stConnectMqtt");
+    //         //flsendmqtt = 1;
+    //         break;
 
-        case stSendInit:
-            //send_mqtt_message("/topic/p1", "asd");
-            if(flsendmqtt == 1){
-                flsendmqtt = 0;
-                sprintf(topic, "cpap/init/%s", mac);
-                sprintf(payload, "{'s':'%s'}", mac);
-                //sprintf(strcont2, "%02X:%02X:%02X:%02X:%02X:%02X/E2", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-                //sprintf(strcont, "%ld",cntEv2);
-                send_mqtt_message(topic, payload);
-                ESP_LOGI(TAG, "mensaje enviado");
-            }
+    //     case stSendInit:
+    //         //send_mqtt_message("/topic/p1", "asd");
+    //         if(flsendmqtt == 1){
+    //             flsendmqtt = 0;
+    //             sprintf(topic, "cpap/init/%s", mac);
+    //             sprintf(payload, "{'s':'%s'}", mac);
+    //             //sprintf(strcont2, "%02X:%02X:%02X:%02X:%02X:%02X/E2", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    //             //sprintf(strcont, "%ld",cntEv2);
+    //             send_mqtt_message(topic, payload);
+    //             ESP_LOGI(TAG, "mensaje enviado");
+    //         }
 
-            //para pruebas
-            flsendmqtt = 1;
-            mqtt_state = stSendRecord;
-            break;
+    //         //para pruebas
+    //         flsendmqtt = 1;
+    //         mqtt_state = stSendRecord;
+    //         break;
 
-        case stSendRecord:
-            if(flsendmqtt == 1){
-                flsendmqtt = 0;
-                sprintf(topic, "cpap/record/%s", mac);
-                sprintf(payload, "{'s':'%s','init':'1','ev':'0','t':'1724272399','var':{'95':'12','tt':'5.5','mx':'15','mn':'8','ia':'3','bf':'12','f%%':'51'}}", mac);
-                //sprintf(strcont2, "%02X:%02X:%02X:%02X:%02X:%02X/E2", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-                //sprintf(strcont, "%ld",cntEv2);
-                send_mqtt_message(topic, payload);
-                ESP_LOGI(TAG, "mensaje enviado");
-            }
+    //     case stSendRecord:
+    //         if(flsendmqtt == 1){
+    //             flsendmqtt = 0;
+    //             sprintf(topic, "cpap/record/%s", mac);
+    //             sprintf(payload, "{'s':'%s','init':'1','ev':'0','t':'1724272399','var':{'95':'12','tt':'5.5','mx':'15','mn':'8','ia':'3','bf':'12','f%%':'51'}}", mac);
+    //             //sprintf(strcont2, "%02X:%02X:%02X:%02X:%02X:%02X/E2", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    //             //sprintf(strcont, "%ld",cntEv2);
+    //             send_mqtt_message(topic, payload);
+    //             ESP_LOGI(TAG, "mensaje enviado");
+    //         }
 
-            break;
+    //         break;
 
 
-        default:
-            break;  
-    }
+    //     default:
+    //         break;  
+    // }
 }

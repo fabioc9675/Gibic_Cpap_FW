@@ -7,7 +7,7 @@
       "OPENOCD_SCRIPTS": "/home/darwin/.espressif/tools/openocd-esp32/v0.12.0-esp32-20240318/openocd-esp32/share/openocd/scripts",
       "ESP_ROM_ELF_DIR": "/home/darwin/.espressif/tools/esp-rom-elfs/20240305/"
     },
-    "idf.espIdfPath": "/home/darwin/Documents/esp/v5.3/esp-idf",
+    "idf.espIdfPath": "/home/darwin/Documents/esp/v5.4/esp-idf",
     "idf.openOcdConfigs": [
          "board/esp32s3-builtin.cfg"
       ],
@@ -40,6 +40,19 @@
       "stat.h": "c",
       "types.h": "c",
       "freertos.h": "c",
-      "cmath": "c"
-    }
+      "cmath": "c",
+      "wifiserver.h": "c",
+      "condition_variable": "cpp",
+      "ctime": "cpp",
+      "mutex": "cpp",
+      "charconv": "cpp",
+      "chrono": "cpp",
+      "future": "cpp",
+      "limits": "cpp",
+      "numeric": "cpp",
+      "ratio": "cpp",
+      "tuple": "cpp",
+      "type_traits": "cpp"
+    },
+    "idf.pythonInstallPath": "/usr/bin/python3"
 }
