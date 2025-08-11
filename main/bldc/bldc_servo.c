@@ -46,6 +46,24 @@ mcpwm_generator_config_t generator_config = {
 
 void bldc_servo_app(void *pvParameters)
 {
+        // Check if components are already initialized and deinitialize them
+    if (timer != NULL) {
+        mcpwm_timer_disable(timer);
+        mcpwm_del_timer(timer);
+        timer = NULL;
+    }
+    if (oper != NULL) {
+        mcpwm_del_operator(oper);
+        oper = NULL;
+    }
+    if (comparator != NULL) {
+        mcpwm_del_comparator(comparator);
+        comparator = NULL;
+    }
+    if (generator != NULL) {
+        mcpwm_del_generator(generator);
+        generator = NULL;
+    }
     /*
      * Crea el timer
      */ 
@@ -94,13 +112,13 @@ void bldc_servo_app(void *pvParameters)
             uint16_t bldc = 0;
             xQueueReceive(bldc_App_queue, &bldc, portMAX_DELAY);
             //ESP_LOGI("main", "Received bldc value %d", bldc);
-            if(bldc == 0xFFFE){
-                mcpwm_comparator_set_compare_value(comparator, 0);
-            }else{
-                mcpwm_comparator_set_compare_value(comparator, bldc);
+            if (bldc > SERVO_TIMEBASE_PERIOD) {
+                bldc = SERVO_TIMEBASE_PERIOD;
             }
+            mcpwm_comparator_set_compare_value(comparator, bldc);
         }
         //printf("bldc_servo_app\n");
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        //vTaskDelay(10 / portTICK_PERIOD_MS);
+        vTaskDelay(1);
     }
 }

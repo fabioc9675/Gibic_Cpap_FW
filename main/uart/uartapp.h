@@ -67,6 +67,7 @@ void uart_app(void *pvParameters);
 void checkSerialDwin();
 void saveData();
 bool checkSequence();
+void changeToPage(uint8_t page);
 bool writeDWIN(unsigned int reg, uint8_t value);
 void initScreen();
 

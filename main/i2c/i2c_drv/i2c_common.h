@@ -116,7 +116,7 @@ esp_err_t i2c_adc1015_init(void);
  * @param[out] data Data read from ADS1015 register 1
  * @return ESP_OK: Read success. Otherwise failed, please check I2C function fail reason.
  */
-esp_err_t i2c_adc1015_get_ch(uint8_t ch, uint16_t *data);
+esp_err_t i2c_adc1015_get_ch(uint8_t ch, int16_t *data);
 
 /**
  * @brief Read data from ADS1015
@@ -124,7 +124,15 @@ esp_err_t i2c_adc1015_get_ch(uint8_t ch, uint16_t *data);
  * @return ESP_OK: Read success. Otherwise failed, please check I2C function fail reason.
  * @note This function is used after i2c_adc1015_get_ch
  */
-esp_err_t i2c_adc1015_read_ch(uint16_t *data);
+esp_err_t i2c_adc1015_read_ch(int16_t *data);
+
+/**
+ * @brief Get pressure from ADC value
+ * @param adc_value ADC value read from ADS1015
+ * @param offset Offset to be applied to pressure calculation
+ * @return Pressure in float format
+ */
+float get_pressure(uint16_t adc_value, float offset);
 
 
 /**************************************************************************
@@ -186,7 +194,14 @@ esp_err_t xSdp810_StartContinousMeasurement(Sdp800TempComp  tempComp,
  */
 esp_err_t xSdp810_ReadMeasurementResults(float *diffPressure , float *temperature);
 
-
+/**
+ * @brief get flow measurement from SDP810
+ * @param fraw Raw flow value from SDP810
+ * @param offset Offset to be applied to flow calculation
+ * @return Flow in float format
+ * @note This function applies a specific calibration formula based on the raw flow value.
+ */
+float get_flow(float fraw, float offset);
 
 
 

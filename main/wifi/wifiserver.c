@@ -513,9 +513,24 @@ static esp_err_t delete_post_handler(httpd_req_t *req)
     /* Delete file */
     unlink(filepath);
 
+    // refresh browser
+    const char *uri_relative = req->uri + sizeof("/delete") - 1;
+    char redirect_path[FILE_PATH_MAX] = "";
+       
+    char *last_slash = strrchr(uri_relative, '/');
+    
+    if (last_slash) {
+        strlcpy(redirect_path, uri_relative, sizeof(redirect_path));
+        redirect_path[(last_slash+1) - uri_relative] = '\0'; // Truncar en la última '/'
+        //*(last_slash+1) = '\0'; // Trunca la cadena en la última '/'
+    } else {
+        strlcpy(redirect_path, "/", sizeof(redirect_path)); // Si es raíz
+    }
+    
     /* Redirect onto root to see the updated file list */
     httpd_resp_set_status(req, "303 See Other");
-    httpd_resp_set_hdr(req, "Location", "/");
+    httpd_resp_set_hdr(req, "Location", redirect_path);
+    //httpd_resp_set_hdr(req, "Location", "/");
 #ifdef CONFIG_EXAMPLE_HTTPD_CONN_CLOSE_HEADER
     httpd_resp_set_hdr(req, "Connection", "close");
 #endif

@@ -5,6 +5,7 @@ void init_sdmmc(void) {
     // Configura los pines para el módulo SDMMC
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.flags = SDMMC_HOST_FLAG_4BIT; // Configura para 4 líneas de datos
+    host.max_freq_khz = SDMMC_FREQ_HIGHSPEED; // Configura la frecuencia máxima a 20MHz
 
     sdmmc_slot_config_t slot = SDMMC_SLOT_CONFIG_DEFAULT();
     slot.width = 4; // Configura para 4 líneas de datos

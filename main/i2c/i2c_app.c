@@ -1,5 +1,18 @@
 #include "i2c/i2c_app.h"
 
+/**
+ * @todo:
+ * - Implement a function to initialize the I2C bus and devices.
+ * - Implement a function to read offsets.
+ */
+
+
+/*
+    intercalar lectura del adc con la de los otros dispositivos 
+    presentes, teneiendo en cuanta que el adc tiene un pin de 
+    interrupcion que se activa cuando cuando la conversion esta lista
+*/
+
 i2c_master_bus_handle_t I2C1_bus_handle;
 QueueHandle_t i2c_App_queue = NULL;
 
@@ -14,6 +27,15 @@ i2c_master_bus_config_t i2c1_bus_conf = {
 };
 
 i2c_master_dev_handle_t ds_handle;
+
+// var maquina estados
+i2c_stetes_t i2c_state = st_init;
+
+int16_t adc=0;
+float offsetPresion = 0;
+float offsetFlujo = 0;
+
+TickType_t xLastWakeTime;
 
 /*
  *@brief I2C1 master initialization
@@ -40,14 +62,6 @@ esp_err_t I2C1_init(void)
 
     return ret;
 }
-
-
-// var maquina estados
-i2c_stetes_t i2c_state = st_init;
-
-uint16_t adc=0;
-float offsetPresion = 0;
-
 
 /**
  * task for sample i2c devices
@@ -76,7 +90,10 @@ void i2c_app(void *pvParameters)
     while (ret != ESP_OK) {
        ret = i2c_adc1015_read_ch(&adc);    
     }
-    offsetPresion = (float)(((adc)/(0.2*3000))-1);
+    offsetPresion = get_pressure(adc, 0); 
+    ESP_LOGI("I2C_APP", "offset presion raw: %d", adc);
+    ESP_LOGI("I2C_APP", "offset presion: %f", offsetPresion);
+    //offsetPresion = (float)(((adc)/(0.2*3000))-1);
 
     if(ESP_OK !=xSdp810_StartContinousMeasurement(SDP800_TEMPCOMP_MASS_FLOW, SDP800_AVERAGING_TILL_READ)){
         #ifdef DEBUG
@@ -93,20 +110,21 @@ void i2c_app(void *pvParameters)
                 break;
 
             case st_reqAdc0: //request presion
+                //ESP_LOGI("I2C_APP", "init adc");
+                // Initialize the xLastWakeTime variable with the current time
+                xLastWakeTime = xTaskGetTickCount();
                 (void)i2c_adc1015_get_ch(3, &adc);
                 i2c_state = st_rsdp810;
                 break;
 
             case st_rsdp810: //read sdp810
                 (void)xSdp810_ReadMeasurementResults(&sdppresiondiff, &sdptemperatura);
-                //datos.flujo = sdppresiondiff;
+                sdppresiondiff -= offsetFlujo;
+                datos.fraw = sdppresiondiff;
+                datos.tempFlujo = sdptemperatura;
                 // de acuerdo a la caracterizacion de la sdp810
-                // que el flujo es -0.02*x*x + 1.85*x 1.83
-                datos.flujo = -0.02*sdppresiondiff*sdppresiondiff + 1.85*sdppresiondiff - 1.83;
-                #ifdef DEBUG
-                    printf("presion: %0.2f\n", sdppresiondiff);
-                    printf("sdptemperatura: %0.2f\n", sdptemperatura);
-                #endif
+                datos.flujo = get_flow (sdppresiondiff, offsetFlujo);
+            
                 i2c_state = st_rAdc0;
                 break;
 
@@ -118,29 +136,23 @@ void i2c_app(void *pvParameters)
                         printf("esperando conversion adc\n");   
                     #endif
                 }
+                datos.praw = adc;
+                datos.presion = get_pressure(adc, offsetPresion);
+
                 i2c_state = st_iddle;
                 break;   
 
             case st_iddle:
-                datos.presion = ((adc)/(0.2*3000))-1;
-                datos.presion -= offsetPresion;
-                datos.presion *= 10;
-                datos.flujo = sdppresiondiff;
-                datos.tempFlujo = sdptemperatura;
+                
                 xQueueSend(i2c_App_queue, &datos, 0);
-                vTaskDelay(50 / portTICK_PERIOD_MS);
                 i2c_state = st_reqAdc0;
+                //ESP_LOGI("I2C_APP", "fin adc");                
+                vTaskDelayUntil(&xLastWakeTime, 10 / portTICK_PERIOD_MS);
                 break;
 
             default:
-            break;
+                break;
         }
 
     }
 }
-
-/*
-    intercalar lectura del adc con la de los otros dispositivos 
-    presentes, teneiendo en cuanta que el adc tiene un pin de 
-    interrupcion que se activa cuando cuando la conversion esta lista
-*/

@@ -146,7 +146,7 @@ void send_mqtt_message(char *topic, char *message)
 //definar tags mqtt_app_start
 
 void MSmqtt(){
-    esp_err_t err = ESP_FAIL;
+    //esp_err_t err = ESP_FAIL;
 
     // switch(mqtt_state)
     // {

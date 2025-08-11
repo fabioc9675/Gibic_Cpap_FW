@@ -225,5 +225,30 @@ esp_err_t xCheckCrc(uint8_t *data, uint8_t size, uint8_t checksum){
   return (crc == checksum) ? ESP_OK : ESP_FAIL;
 }
 
-//27mm
-//12mm
+
+/**
+ * @brief get flow measurement from SDP810
+ * @param fraw Raw flow value from SDP810
+ * @param offset Offset to be applied to flow calculation
+ * @return Flow in float format
+ * @note This function applies a specific calibration formula based on the raw flow value.
+ */
+float get_flow(float fraw, float offset) {
+    float flow = 0; 
+    if(fraw < 0.25) {
+        // y = -1 * (4.4427 * sqrt(|x|) + -0.5876) + 0.5388*x + 0.0028*x^2
+        float abs_fraw = fabsf(fraw);
+        flow = -1 * ((4.4427 * sqrtf(abs_fraw)) - 0.5876) +
+                        (0.5388 * fraw) +
+                        (0.0028 * fraw * fraw); 
+    }else if(fraw > 0.25) {
+        // y = (11.0380 * sqrt(|x|) + -10.6718) + -0.4424*x + 0.0037*x^2
+        flow = (11.0380 * sqrtf(fraw) + -10.6718) +
+                        (-0.4424 * fraw) +
+                        (0.0037 * fraw * fraw);  
+    }else {
+        flow = 0.0;
+    }
+
+    return flow;
+}

@@ -14,11 +14,16 @@
 
 
 struct Datos_usd{
-    uint32_t timestamp;
-    uint8_t bldc;
-    float presion;
-    float flujo;
-    float tempflujo;
+    uint16_t bldc;
+    int16_t praw;  // sensor raw presion
+    float presion; // sensor presion
+    float presionfl; // sensor filtrada presion
+    float fraw;    // sensor raw flujo
+    float flujo;   // sensor flujo
+    float flujofl; // sensor filtrada flujo
+    float pdata;
+    uint8_t fl1;
+    uint8_t fl2;
 };
 
 void sd_App(void *pvParameters);

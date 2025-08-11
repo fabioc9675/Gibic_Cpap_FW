@@ -2,6 +2,7 @@
 #include <string.h>
 #include <sys/unistd.h>
 #include <sys/stat.h>
+#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -12,10 +13,30 @@
 #include "bldc/bldc_servo.h"
 #include "uart/uartapp.h"
 #include "control/control.h"
+#include "control/filter.h"
 
 #include "wifi/wifiserver.h"
 
-//#define CARACTERIZACION
+// Implementación de las funciones
+void print_task_stats(void) {
+    char buffer[1024];
+    vTaskGetRunTimeStats(buffer);
+    printf("Task Stats:\n%s\n", buffer);
+}
+
+void print_task_list(void) {
+    char buffer[1024];
+    vTaskList(buffer);
+    printf("Task List:\n%s\n", buffer);
+}
+
+void task_monitor(void *pvParameters) {
+    while(1) {
+        print_task_stats();
+        print_task_list();
+        vTaskDelay(pdMS_TO_TICKS(5000)); // Cada 5 segundos
+    }
+}
 
 /**
  * task handlers
@@ -29,7 +50,7 @@ TaskHandle_t thBldcApp = NULL;
  * flags and variables for the system
  */
 uint8_t flProcSen = 0; //flag para procesar sensores se stea en 1 cuando hay datos nuevos
-uint8_t setPointPresion = 0;
+uint8_t setPointPresion = 4;
 
 //todo: verificar si el timestamp esta en segundos o milisegundos.
 
@@ -53,12 +74,14 @@ typedef enum
     initbldc,
     initCpap,
     bldcoff,
-    endCpap
-
+    endCpap,
+    wifiserver,
+    wifiend
 } MS_STATES;
 
 MS_STATES msEstados = idle;
 
+// function to kill a task
 void killTask(TaskHandle_t *pxTaskHandle)
 {
     if(pxTaskHandle != NULL && *pxTaskHandle != NULL)
@@ -75,6 +98,7 @@ void killTask(TaskHandle_t *pxTaskHandle)
 //TaskHandle_t bldcTaskHandle = NULL; // Identificador para la tarea i2c_app
 void app_main(void)
 {
+    //xTaskCreate(task_monitor, "TaskMonitor", 4096, NULL, 5, NULL);
     /**
      * essential for the system
      */
@@ -89,7 +113,9 @@ void app_main(void)
     uart_app_queue = xQueueCreate(10, sizeof(struct uartDataIn));
     uart_app_queue_rx = xQueueCreate(10, sizeof(struct ToUartData ));
     xTaskCreate(uart_app, "uart_app", 4096, NULL, 10, &thUartApp);
- 
+    filter_t *fl_press = filter_create(2);
+    filter_t *fl_flow = filter_create(2);
+
     for(;;)
     {   
         // Process LCD data
@@ -97,7 +123,7 @@ void app_main(void)
             struct uartDataIn datos;
             
             xQueueReceive(uart_app_queue, &datos, 0);
- 
+            ESP_LOGI("LCD", "RAW, c: %d, v: %d", datos.command, datos.value);
             switch (datos.command)
             {
             case 'P': //presion objetivo
@@ -113,15 +139,18 @@ void app_main(void)
                     }
                     
                 }else if(datos.value==0){
-                    setPointPresion = 0;
+                    //setPointPresion = 0;
                     msEstados = bldcoff;
                 }   
                 break;
                     
-                case 0:
-                    vTaskDelete(thUartApp);
-                    wifi_init_ap();
-                    start_file_server("/sd");//printf("en case 0\n");
+            case 'F':
+                if (datos.value == 1){
+                    msEstados = wifiserver;
+                }else{
+                    esp_restart();
+                }   
+                    
                 break;
 
             default:
@@ -138,6 +167,8 @@ void app_main(void)
                 //init queue and task sdcard
                 sd_App_queue = xQueueCreate(10, sizeof(struct Datos_usd));
                 xTaskCreate(sd_App, "sd_App", 4096, NULL, 10, &thSdApp);
+                filter_init(fl_press, butn, butd);
+                filter_init(fl_flow, butn, butd);
                 msEstados = initSensors;//iniciar proceso
                 break;
             
@@ -157,74 +188,81 @@ void app_main(void)
 
             case initCpap:
                 struct Datos_usd datos_usd;
-                while(uxQueueMessagesWaiting(i2c_App_queue) > 0){ //cola con datos de i2c
-
-                /**
-                 * todo: la cola de la sd debe complementarse con datos de los 
-                 * algoritmos de deteccion de apnea. esta parte es temporal
-                 * aunque podria reutilizarse solo para encapsular los datos
-                 * para el algoritmo de control
-                 */
-                
-                    struct Datos_I2c datos_i2c;
-                    xQueueReceive(i2c_App_queue, &datos_i2c, 0);
-                    //datos_usd.timestamp = esp_log_timestamp() + init_time;
-                    datos_usd.timestamp = esp_log_timestamp();
-                    
-                    datos_usd.presion = datos_i2c.presion;
-                    datos_usd.flujo = datos_i2c.flujo;
-                    //printf("presion %0.2f\n",datos_i2c.presion);
-    
+                while(uxQueueMessagesWaiting(i2c_App_queue) > 0)
+                { 
                     /**
-                     *esto es temporal   
+                     * @todo: la cola de la sd debe complementarse con datos de los 
+                     * algoritmos de deteccion de apnea. esta parte es temporal
+                     * aunque podria reutilizarse solo para encapsular los datos
+                     * para el algoritmo de control
                      */
-                //     if(!cnt--){
-                //         struct ToUartData touartdata;
-                //         cnt=10;
-                //         touartdata.command = UPresion;
-                //         touartdata.value = (int8_t)datos_i2c.presion;
-                //         xQueueSend(uart_app_queue_rx, &touartdata,0);
-                //     }
-                    datos_usd.tempflujo = datos_i2c.tempFlujo;
-                    xQueueSend(sd_App_queue, &datos_usd, 0);
-                // //ESP_LOGI("MAIN", "presion: %0.2f, flujo: %0.2f", datos_usd.presion, datos_usd.flujo);
-                // flProcSen = 1;
-                    bldc_sp = controller(setPointPresion, datos_usd.presion);
-        //             //ESP_LOGI("MAIN", "bldc_sp: %d", bldc_sp);
+                    struct Datos_I2c datos_i2c;
+                    // get data from i2c
+                    xQueueReceive(i2c_App_queue, &datos_i2c, 0);
+
+                    // process low pass filter
+                    lp_filter(fl_press, datos_i2c.presion, &datos_usd.presionfl);
+                    lp_filter(fl_flow, datos_i2c.flujo, &datos_usd.flujofl);
+
+                    // process pid control
+                    //bldc_sp = controller(setPointPresion, datos_i2c.presion, datos_i2c.flujo);
+                    bldc_sp = controller(setPointPresion, datos_usd.presionfl, datos_usd.flujofl);
+                    
                     xQueueSend(bldc_App_queue, &bldc_sp, 0);
-        //             //procesar datos
-        //             //enviar a la pantalla
-        //             //enviar a la sd
+                    
+                    // data to sd
+                    datos_usd.bldc = bldc_sp;
+                    datos_usd.praw = datos_i2c.praw;
+                    datos_usd.presion = datos_i2c.presion;
+                    datos_usd.fraw = datos_i2c.fraw;
+                    datos_usd.flujo = datos_i2c.flujo;
+                    datos_usd.pdata = 0;
+                    datos_usd.fl1 = 0;
+                    datos_usd.fl2 = 0;  
+                    printf(">P_set:%d,Pres:%.4f,Presfl:%.4f\r\n", 
+                            setPointPresion, 
+                            datos_usd.presion, 
+                            datos_usd.presionfl);   
+                    xQueueSend(sd_App_queue, &datos_usd, 0);
+                    //ESP_LOGI("SETPOINT","SETPOINT: %d", setPointPresion);
+                
                 }
-        //     //proceso en ejecucion
                 break;
+            
             case bldcoff:
                 //turn off bldc
                 bldc_sp = 0;
                 xQueueSend(bldc_App_queue, &bldc_sp, 0);
+                vTaskDelay(15);
+                // wait until queue empty
+                while(uxQueueMessagesWaiting(sd_App_queue)>0); // Corrected the comment typo
                 msEstados = endCpap;
                 break;
 
             case endCpap:
                 //terminar procesos
-               
                 killTask(&thSdApp);
                 killTask(&thI2CApp);
                 killTask(&thBldcApp);
                 msEstados = idle;
                 break;
      
-        //     case wifiserver:
-        //         //creo tarea para el servidor wifi
-                
-        //         break;
+            case wifiserver:
+                wifi_init_ap();
+                start_file_server("/sd");
+                msEstados = wifiend;
+                break;
+
+            case wifiend:
             default:
                 break;
         }
 
          vTaskDelay(1);
+         // vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
+
 /*
 Para pruebas de mqtt 
 printf("Run!\n");
@@ -235,3 +273,33 @@ for(;;)
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 */
+
+/**
+ *     uint16_t bldc;
+    int16_t praw;  // sensor raw presion
+    float presion; // sensor presion
+    float presionfl; // sensor filtrada presion
+    float fraw;    // sensor raw flujo
+    float flujo;   // sensor flujo
+    float flujofl; // sensor filtrada flujo
+    float pdata;
+    uint8_t fl1;
+    uint8_t fl2;
+ */
+
+
+/** 
+ * @todo
+ * - ok. bug de inicio. la pantalla no responde
+ * - ok. carpeta por dia
+ * - ok. ajustar estructura queue de datos sd
+ * - ok. sacar flujo raw a la sd
+ * - caracterizacion de flujo
+ * - nuevo modelo del sistema y controlador
+ * - anexar set pont de presion
+ * - algoritmo de nataly
+ * - boton de volver al directori anterior. en web
+ * - borrado de archivos masivos
+ * 
+ */
+

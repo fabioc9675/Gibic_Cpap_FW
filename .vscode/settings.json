@@ -52,7 +52,12 @@
       "numeric": "cpp",
       "ratio": "cpp",
       "tuple": "cpp",
-      "type_traits": "cpp"
+      "type_traits": "cpp",
+      "esp_system.h": "c",
+      "compare": "c",
+      "control.h": "c",
+      "complex": "c",
+      "string.h": "c"
     },
     "idf.pythonInstallPath": "/usr/bin/python3"
 }

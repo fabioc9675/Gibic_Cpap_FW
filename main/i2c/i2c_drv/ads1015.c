@@ -49,7 +49,7 @@ esp_err_t i2c_adc1015_init(){
     return ret;
 }
 
-esp_err_t i2c_adc1015_get_ch(uint8_t ch, uint16_t *data){
+esp_err_t i2c_adc1015_get_ch(uint8_t ch, int16_t *data){
     uint8_t adctemp[3];
     esp_err_t ret;
 
@@ -84,7 +84,7 @@ esp_err_t i2c_adc1015_get_ch(uint8_t ch, uint16_t *data){
 
 }
 
-esp_err_t i2c_adc1015_read_ch(uint16_t *data){
+esp_err_t i2c_adc1015_read_ch(int16_t *data){
     esp_err_t ret;
 
     //read config register
@@ -113,4 +113,13 @@ esp_err_t i2c_adc1015_read_ch(uint16_t *data){
         ret = ESP_ERR_NOT_FINISHED;
     }
     return ret;
+}
+
+
+float get_pressure(uint16_t adc_value, float offset) {
+    // Convert ADC value to pressure in cmH2O
+    // Assuming a linear conversion for demonstration purposes
+    // Adjust the conversion factor as per your calibration
+    float pressure = (((adc_value / 600.0)-1)*10)- offset; 
+    return pressure;
 }

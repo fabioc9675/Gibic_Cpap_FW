@@ -9,7 +9,7 @@
 
 #include "uart/uartapp.h"
 
-static const char *TAG = "uart_events";
+//static const char *TAG = "uart_events";
 
 // uart port number
 #define uart_num 1
@@ -19,21 +19,22 @@ QueueHandle_t uart_app_queue = NULL;
 QueueHandle_t uart_app_queue_rx = NULL;
 
 uint8_t dataToWrite[8] = {0x5A, 0XA5, 0X05, 0X82, 0x00, 0x00, 0x00, 0x00}; // Secuencia a escribir los 4 ultimos se llenan de acuerdo al registro y valor a escribir
-
 uint8_t header[HEADER_LENGTH] = {0x5A, 0xA5};
 uint8_t writeSuccessful[ACK_LENGTH] = {0x5A, 0xA5, 0x03, 0x82, 0x4F, 0x4B};
 uint8_t buffer[READING_LENGTH];
 
 int brillo, presion, presionAct, tiempo, humedad = 0;
-//bool fugas, running = 0;
+
 bool fugas = 0;
 uint8_t running  = 0;
 int seqLength = READING_LENGTH;
 
 void uart_app(void *pvParameters)
 {
-    /* Configure parameters of an UART driver,
-     * communication pins and install the driver */
+    /**
+     * Configure parameters of an UART driver,
+     * communication pins and install the driver 
+     */
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -43,21 +44,25 @@ void uart_app(void *pvParameters)
         .source_clk = UART_SCLK_DEFAULT,
     };
     // Install UART driver, and get the queue.
+    
     uart_driver_install(uart_num, BUF_SIZE * 2, BUF_SIZE * 2, 10, &uart1_queue, 0);
+
     ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
 
     // set pins for uart
     ESP_ERROR_CHECK(uart_set_pin(uart_num, TXD_PIN, RXD_PIN, RTS_PIN, CTS_PIN));
 
     // Set UART log level
-    esp_log_level_set(TAG, ESP_LOG_INFO);
+    //esp_log_level_set(TAG, ESP_LOG_INFO);
 
     // Ejemplo de configuracion inicial para los valores, inicializar donde corresponda y comentar aca
     brillo = 50;
-    presion = 7;
+    presion = 4;
     tiempo = 15;
     humedad = 4;
-
+    
+    changeToPage(50); // Cambia a la pagina 0
+    
     for (;;)
     {
         // read from port serial Dwin
@@ -89,15 +94,15 @@ void uart_app(void *pvParameters)
 // Rutina que esta verificando si se ha recibido una secuencia de la pantalla
 void checkSerialDwin()
 {
-
     int len = 0;
-
     uart_get_buffered_data_len(uart_num, (size_t *)&len);
+
     if (len > 0)
     {
         uart_read_bytes(uart_num, buffer, len, 1);
         saveData();
     }
+
     vTaskDelay(5);
 }
 
@@ -112,7 +117,6 @@ void saveData()
         {
             //ESP_LOGI(TAG, "Comunicacion confirmada!");
             //ESP_LOGI(TAG, "Brillo: %d, presion: %d, presionAct: %d,tiempo: %d, humedad: %d, fugas: %d, running: %d", brillo, presion, presionAct, tiempo, humedad, fugas, running);
-                
         }
     }
 }
@@ -140,6 +144,7 @@ bool checkSequence()
     {                                                  // Secuencia de lectura, con informacion de un registro
         uint16_t reg = (buffer[4] << 8) | buffer[5];   // Obtiene el numero del registro
         uint16_t value = (buffer[7] << 8) | buffer[8]; // Guarda el valor
+        //ESP_LOGI(TAG, "comando: %04x, val:  %04x", reg, value );
         switch (reg)
         {
         case BRILLO_REG:
@@ -158,6 +163,8 @@ bool checkSequence()
             break;
         case FUGAS_REG:
             fugas = value;
+            datos.command = 'F';
+            datos.value = fugas;
             break;
         case RUNNING:
             running = value;
@@ -196,7 +203,6 @@ void changeToPage(uint8_t page){
   uart_write_bytes(uart_num, (const char *)dataToSend, sizeof(dataToSend));
   seqLength=ACK_LENGTH;//Esperara la secuencia de confirmacion de escritura
 }
-
 
 /**
  * @brief Escribe en uno de los registros de la pantalla DWIN

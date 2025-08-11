@@ -2,6 +2,7 @@
 #define I2C_APP_H
 
 #include "i2c/i2c_drv/i2c_common.h"
+#include <math.h>
 #include <time.h>
 
 
@@ -14,8 +15,10 @@ extern QueueHandle_t i2c_App_queue;
 
 
 struct Datos_I2c{
+    float fraw;
     float presion;
     float flujo;
+    int16_t praw;
     float tempFlujo;
 };
 
