@@ -6,8 +6,8 @@
 #include <string.h>
 #include <sys/stat.h>
 
-extern const float butn[2];
-extern const float butd[2];
+extern const float butn[3];
+extern const float butd[3];
 
 typedef struct {
     uint8_t fcof; // filter order

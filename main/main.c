@@ -17,13 +17,31 @@
 
 #include "wifi/wifiserver.h"
 
-// Implementación de las funciones
+/**
+ * Task Stats:  
+ * Task        TiempoEjecución  Porcentaje  
+ * 
+ * Task	Nombre de la tarea.
+ * TiempoEjecución	Tiempo total de ejecución en ticks (unidades dependen de portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()).
+ * Porcentaje	Porcentaje del tiempo total de CPU consumido por la tarea.
+ */
 void print_task_stats(void) {
     char buffer[1024];
     vTaskGetRunTimeStats(buffer);
-    printf("Task Stats:\n%s\n", buffer);
+
+    printf("Task Stats:\nTask\t\tTicksE\t\t%%\n%s\n", buffer);
 }
 
+/**
+ * Task List:  
+ * Nombre      Estado   Prioridad  StackLibre  NúmTask  
+ * 
+ * Nombre	Nombre de la tarea (configurado en xTaskCreate()).
+ * Estado	R (Ready), B (Blocked), S (Suspended), D (Deleted).
+ * Prioridad	Prioridad de la tarea (0 = más baja).
+ * StackLibre	Bytes libres en el stack de la tarea (útil para detectar overflow).
+ * NúmTask	Identificador numérico de la tarea.
+ */
 void print_task_list(void) {
     char buffer[1024];
     vTaskList(buffer);
@@ -33,7 +51,7 @@ void print_task_list(void) {
 void task_monitor(void *pvParameters) {
     while(1) {
         print_task_stats();
-        print_task_list();
+        //print_task_list();
         vTaskDelay(pdMS_TO_TICKS(5000)); // Cada 5 segundos
     }
 }
@@ -80,7 +98,7 @@ typedef enum
 } MS_STATES;
 
 MS_STATES msEstados = idle;
-
+portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()
 // function to kill a task
 void killTask(TaskHandle_t *pxTaskHandle)
 {
@@ -113,8 +131,8 @@ void app_main(void)
     uart_app_queue = xQueueCreate(10, sizeof(struct uartDataIn));
     uart_app_queue_rx = xQueueCreate(10, sizeof(struct ToUartData ));
     xTaskCreate(uart_app, "uart_app", 4096, NULL, 10, &thUartApp);
-    filter_t *fl_press = filter_create(2);
-    filter_t *fl_flow = filter_create(2);
+    filter_t *fl_press = filter_create(3);
+    filter_t *fl_flow = filter_create(3);
 
     for(;;)
     {   
@@ -219,10 +237,11 @@ void app_main(void)
                     datos_usd.pdata = 0;
                     datos_usd.fl1 = 0;
                     datos_usd.fl2 = 0;  
-                    printf(">P_set:%d,Pres:%.4f,Presfl:%.4f\r\n", 
-                            setPointPresion, 
-                            datos_usd.presion, 
-                            datos_usd.presionfl);   
+                    // printf(">BLDC:%0.2f,Flujofl:%.4f,Presfl:%.4f\r\n", 
+                    //        (datos_usd.bldc/100.0f),
+                    //        //setPointPresion, 
+                    //        datos_usd.flujofl, 
+                    //        datos_usd.presionfl);   
                     xQueueSend(sd_App_queue, &datos_usd, 0);
                     //ESP_LOGI("SETPOINT","SETPOINT: %d", setPointPresion);
                 

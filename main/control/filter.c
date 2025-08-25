@@ -1,7 +1,7 @@
 #include "filter.h"
 
-const float butn[2] = { 8.6364023e-02,  8.6364023e-02};
-const float butd[2] = { 1.0000000e+00, -8.2727194e-01};
+const float butn[3] = { 2.008336556421125e-02,  4.016673112842249e-02, 2.008336556421125e-02};
+const float butd[3] = { 1.000000000000000e+00, -1.561018075800718e+00, 6.413515380575630e-01};
 
 filter_t *filter_create(uint8_t fcof) {
     // Crear la estructura del filtro
@@ -65,7 +65,8 @@ void lp_filter(filter_t *filter, float datain, float *dataout){
 
     filter->output[0] = (filter->num[0] * filter->input[0]);
     for(i=1; i<filter->fcof; i++){
-        filter->output[0] += (filter->num[i] * filter->input[i]) - (filter->den[i] * filter->output[i]);
+        filter->output[0] += (filter->num[i] * filter->input[i]) 
+                            - (filter->den[i] * filter->output[i]);
     }
 
     *dataout = filter->output[0];

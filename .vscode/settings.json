@@ -57,7 +57,11 @@
       "compare": "c",
       "control.h": "c",
       "complex": "c",
-      "string.h": "c"
+      "string.h": "c",
+      "freertosconfig.h": "c",
+      "*.old": "c",
+      "random": "c",
+      "regex": "c"
     },
     "idf.pythonInstallPath": "/usr/bin/python3"
 }
