@@ -76,10 +76,12 @@ uint16_t bldc_sp = 100;
 uint8_t flag_bldc = 0;
 uint8_t spbldctemp = 0;
 
+
 /**
  * temporal para enviar a la pantalla
  */
 uint8_t cnt=10;
+
 
 /*
  *Variable para manejar los estados del sistema
@@ -133,7 +135,7 @@ void app_main(void)
     xTaskCreate(uart_app, "uart_app", 4096, NULL, 10, &thUartApp);
     filter_t *fl_press = filter_create(3);
     filter_t *fl_flow = filter_create(3);
-
+    
     for(;;)
     {   
         // Process LCD data
@@ -185,8 +187,8 @@ void app_main(void)
                 //init queue and task sdcard
                 sd_App_queue = xQueueCreate(10, sizeof(struct Datos_usd));
                 xTaskCreate(sd_App, "sd_App", 4096, NULL, 10, &thSdApp);
-                filter_init(fl_press, butn, butd);
-                filter_init(fl_flow, butn, butd);
+                filter_init(fl_press, butn3, butd3);
+                filter_init(fl_flow, butn3, butd3);
                 msEstados = initSensors;//iniciar proceso
                 break;
             
@@ -221,7 +223,7 @@ void app_main(void)
                     // process low pass filter
                     lp_filter(fl_press, datos_i2c.presion, &datos_usd.presionfl);
                     lp_filter(fl_flow, datos_i2c.flujo, &datos_usd.flujofl);
-
+                    
                     // process pid control
                     //bldc_sp = controller(setPointPresion, datos_i2c.presion, datos_i2c.flujo);
                     bldc_sp = controller(setPointPresion, datos_usd.presionfl, datos_usd.flujofl);

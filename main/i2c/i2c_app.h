@@ -33,12 +33,4 @@ typedef enum {
     st_iddle
 } i2c_stetes_t;
 
-
-
-
-
-
-
-
-
 #endif // I2C_APP_H
