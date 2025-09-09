@@ -148,3 +148,21 @@ float median(float *data, float new_value, uint8_t size) {
         return temp[size / 2];
     }
 }
+
+/**
+ * @brief Calculates the mean of an array of floats.
+ * @param data Pointer to the array of floats.
+ * @param size Size of the array.
+ * @return The mean value.
+ */
+float mean(float *data, uint16_t size) {
+    if (data == NULL || size == 0) {
+        return 0.0f; // invalid input
+    }
+
+    float sum = 0.0f;
+    for (uint16_t i = 0; i < size; i++) {
+        sum += data[i];
+    }
+    return sum / size;
+}

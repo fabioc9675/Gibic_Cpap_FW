@@ -8,18 +8,18 @@
 #define DT                 (1.0f/SAMPLE_HZ)
 
 /* ---------- Pneumatic model (nominal) ---------- */
-static const float Ku        = 0.1796f;      // (L s⁻¹)/(% PWM)1.796f; 90.0 supone un dead band de 10%
+static const float Ku        = 0.256f;//0.1796f;      // (L s⁻¹)/(% PWM)1.796f; 90.0 supone un dead band de 10%
 
 static const float C_L       = 0.30f;      // Compliance (L/cmH₂O)     // 0.8f
-static const float R_aw      = 5.0f;       // Airway resistance ((cmH₂O·s)/L)    // 3.0f
+static const float R_aw      = 1.0f;       // Airway resistance ((cmH₂O·s)/L)    // 3.0f
 static const float kL        = 0.05f;      // Linear leak (L s⁻¹/cmH₂O)
 static const float tau       = (R_aw + kL) * C_L;   // Time constant 0.7625
 
 /* IMC tuning (λ = 0.3 τ) */
 static const float lambda_imc = 0.3f * tau;
-static const float Kc         = (0.5f * tau) / (lambda_imc * Ku * C_L);//0.5
+static const float Kc         = (0.50f * tau) / (lambda_imc * Ku * C_L);//0.5
 static const float Ti         = 3.0f * tau;                 // 3 Integrator time
-static const float Kd         = 0.1f * Kc * Ti;           // Derivative gain if desired
+static const float Kd         = 0.01f * Kc * Ti;           // Derivative gain if desired
 
 /* ---------- Globals ---------- */
 static volatile float PEAP_cmH2O  = 0.0f;      // Ambient gauge reference
@@ -27,6 +27,7 @@ static volatile float PEAP_cmH2O  = 0.0f;      // Ambient gauge reference
 static float error = 0.0f;
 static float e_prev = 0.0f; // Previous error for derivative
 static float p_prev = 0.0f; // Previous pressure for derivative
+static float uff = 0.0f;            // feedforward term
 static float up = 0.0f;            // Proportional term
 static float ui = 0.0f;            // Integrator term
 static float ud = 0.0f;            // Derivative term
@@ -50,13 +51,16 @@ uint16_t controller(uint8_t setpointPresion, float presion, float flow)
     float u = 0.0f;           // Control signal
     error = setpointPresion - presion;
 
+    // Feedforward term
+    //uff = 35;
+
     // Proportional term
     up = Kc * error;
     
     // Integral term
-    float u_unsat = up + ui + ud;
-    float u_sat   = clamp(u_unsat, 5.0f, 100.0f);
-    ui += (Kc*DT/Ti)*error + (DT/(Ti/Kc))*(u_sat - u_unsat);
+    //float u_unsat = up + ui + ud;
+    //float u_sat   = clamp(u_unsat, 5.0f, 100.0f);
+    ui += (Kc*DT/Ti)*error;// + (DT/(Ti/Kc))*(u_sat - u_unsat);
     ui = clamp(ui, -25.0f, 25.0f);            // Anti‑windup
 
     // Derivative term
@@ -66,7 +70,7 @@ uint16_t controller(uint8_t setpointPresion, float presion, float flow)
     ud = median(ud_m, ud, 5);
     
     // Combine terms
-    u = up + ui + ud;
+    u = uff + up + ui + ud;
 
     // diff_fl = flow - tmp;
     // ddiff_fl = (diff_fl - diff_fl_p) / DT;

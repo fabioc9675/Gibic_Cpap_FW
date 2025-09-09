@@ -13,5 +13,7 @@ idf_component_register(SRCS "main.c"
                             "i2c/i2c_app.c"
                             "bldc/bldc_servo.c"
                             "uart/uartapp.c"
+                            "common/common.c"
+                            "proc/fResp.c"
                         INCLUDE_DIRS "."
                         EMBED_FILES "wifi/favicon.ico" "wifi/upload_script.html")   

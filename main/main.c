@@ -14,6 +14,7 @@
 #include "uart/uartapp.h"
 #include "control/control.h"
 #include "control/filter.h"
+#include "proc/fResp.h"
 
 #include "wifi/wifiserver.h"
 
@@ -135,6 +136,7 @@ void app_main(void)
     xTaskCreate(uart_app, "uart_app", 4096, NULL, 10, &thUartApp);
     filter_t *fl_press = filter_create(3);
     filter_t *fl_flow = filter_create(3);
+    fResp_init();
     
     for(;;)
     {   
@@ -232,18 +234,21 @@ void app_main(void)
                     
                     // data to sd
                     datos_usd.bldc = bldc_sp;
-                    datos_usd.praw = datos_i2c.praw;
-                    datos_usd.presion = datos_i2c.presion;
-                    datos_usd.fraw = datos_i2c.fraw;
-                    datos_usd.flujo = datos_i2c.flujo;
-                    datos_usd.pdata = 0;
-                    datos_usd.fl1 = 0;
-                    datos_usd.fl2 = 0;  
+                    //datos_usd.praw = datos_i2c.praw;
+                    //datos_usd.presion = datos_i2c.presion;
+                    //datos_usd.fraw = datos_i2c.fraw;
+                    //datos_usd.flujo = datos_i2c.flujo;
+                    //datos_usd.pdata = 0;
+                    //datos_usd.fl1 = 0;
+                    //datos_usd.fl2 = 0;  
                     // printf(">BLDC:%0.2f,Flujofl:%.4f,Presfl:%.4f\r\n", 
                     //        (datos_usd.bldc/100.0f),
                     //        //setPointPresion, 
                     //        datos_usd.flujofl, 
                     //        datos_usd.presionfl);   
+
+                    processed_signal(datos_usd.flujofl, &datos_usd.t_smp, &datos_usd.t_cp);
+
                     xQueueSend(sd_App_queue, &datos_usd, 0);
                     //ESP_LOGI("SETPOINT","SETPOINT: %d", setPointPresion);
                 

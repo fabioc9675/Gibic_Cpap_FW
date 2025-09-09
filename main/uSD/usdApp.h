@@ -9,6 +9,7 @@
 #include <errno.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "common/common.h"
 
 #include "usdDrv.h"
 
@@ -21,6 +22,8 @@ struct Datos_usd{
     float fraw;    // sensor raw flujo
     float flujo;   // sensor flujo
     float flujofl; // sensor filtrada flujo
+    float t_smp;   // tiempo nataly smoth point
+    float t_cp;   // tiempo nataly center point
     float pdata;
     uint8_t fl1;
     uint8_t fl2;

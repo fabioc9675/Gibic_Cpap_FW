@@ -47,7 +47,7 @@
                     carcnt = 0;
                     pwmtmp += 50;
                     //pwm_output += 25;
-                    ESP_LOGI("Caract", "pwmtmp: %d", pwmtmp);
+                    //ESP_LOGI("Caract", "pwmtmp: %d", pwmtmp);
                 }
 
                 if (pwmtmp > 0){

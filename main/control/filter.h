@@ -63,4 +63,12 @@ void lp_filter(filter_t *filter, float datain, float *dataout);
  */
 float median(float *data, float new_value, uint8_t size);
 
+/**
+ * @brief Calculates the mean of an array of floats.
+ * @param data Pointer to the array of floats.
+ * @param size Size of the array.
+ * @return The mean value.
+ */
+float mean(float *data, uint16_t size);
+
 #endif // FILTER_H

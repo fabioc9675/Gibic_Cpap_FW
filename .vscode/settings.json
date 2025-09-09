@@ -7,7 +7,7 @@
       "OPENOCD_SCRIPTS": "/home/darwin/.espressif/tools/openocd-esp32/v0.12.0-esp32-20240318/openocd-esp32/share/openocd/scripts",
       "ESP_ROM_ELF_DIR": "/home/darwin/.espressif/tools/esp-rom-elfs/20240305/"
     },
-    "idf.espIdfPath": "/home/darwin/Documents/esp/v5.4/esp-idf",
+    "idf.espIdfPath": "/home/darwin/Documents/esp/v5.5.1/esp-idf",
     "idf.openOcdConfigs": [
          "board/esp32s3-builtin.cfg"
       ],
@@ -61,7 +61,12 @@
       "freertosconfig.h": "c",
       "*.old": "c",
       "random": "c",
-      "regex": "c"
+      "regex": "c",
+      "usdapp.h": "c",
+      "filter.h": "c",
+      "vector": "c",
+      "fresp.h": "c",
+      "bitset": "c"
     },
     "idf.pythonInstallPath": "/usr/bin/python3"
 }
