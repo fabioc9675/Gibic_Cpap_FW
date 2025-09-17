@@ -166,12 +166,13 @@ void initfile(void){
     }else{
         sprintf(bufferSd, "CPAP - GIBIC - UDEA\n");
         fprintf(f, bufferSd);
-        sprintf(bufferSd, "Hora de inicio: %04d-%02d-%02d %02d:%02d\n", 
+        sprintf(bufferSd, "Hora de inicio: %04d-%02d-%02d %02d:%02d:%02d\n", 
                 timeinfo.tm_year + 1900, 
                 timeinfo.tm_mon, 
                 timeinfo.tm_mday, 
                 timeinfo.tm_hour, 
-                timeinfo.tm_min);
+                timeinfo.tm_min,
+                timeinfo.tm_sec);
         fprintf(f, bufferSd);
         sprintf(bufferSd, "Tasa de muestreo: 100Hz\n");
         fprintf(f, bufferSd);
