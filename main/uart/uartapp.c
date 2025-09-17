@@ -62,6 +62,7 @@ void uart_app(void *pvParameters)
     humedad = 4;
     
     changeToPage(50); // Cambia a la pagina 0
+    writeDWIN(PRESION_REG, 4);
     
     for (;;)
     {

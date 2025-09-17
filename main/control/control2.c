@@ -46,7 +46,7 @@ static inline float clamp(float x, float lo, float hi)
  * @param flow: Current flow reading
  * @return PWM value for the BLDC motor
  */
-uint16_t controller(uint8_t setpointPresion, float presion, float flow)
+int16_t controller(uint8_t setpointPresion, float presion, float flow)
 {
     float u = 0.0f;           // Control signal
     error = setpointPresion - presion;
@@ -104,8 +104,8 @@ uint16_t controller(uint8_t setpointPresion, float presion, float flow)
     p_prev = presion;
 
     //printf("> P:%f, U:%f, Up:%f, Ui:%f, Ud:%f\n",presion, (u/10.0f), up, ui, ud);
-    printf("> P:%f, U:%f, Up:%f, Ui:%f, Ud:%f,",presion, (u/10.0f), up, ui, ud);
-    printf("FL:%f \n",flow);
+    // printf("> P:%f, U:%f, Up:%f, Ui:%f, Ud:%f,",presion, (u/10.0f), up, ui, ud);
+    // printf("FL:%f \n",flow);
     return (uint16_t)lrintf(u * 10.0f); // Return PWM value in [0, 1000]
 }
 

@@ -91,8 +91,8 @@ void i2c_app(void *pvParameters)
        ret = i2c_adc1015_read_ch(&adc);    
     }
     offsetPresion = get_pressure(adc, 0); 
-    ESP_LOGI("I2C_APP", "offset presion raw: %d", adc);
-    ESP_LOGI("I2C_APP", "offset presion: %f", offsetPresion);
+    // ESP_LOGI("I2C_APP", "offset presion raw: %d", adc);
+    // ESP_LOGI("I2C_APP", "offset presion: %f", offsetPresion);
     //offsetPresion = (float)(((adc)/(0.2*3000))-1);
 
     if(ESP_OK !=xSdp810_StartContinousMeasurement(SDP800_TEMPCOMP_MASS_FLOW, SDP800_AVERAGING_TILL_READ)){

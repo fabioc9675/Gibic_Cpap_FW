@@ -9,6 +9,7 @@ static uint16_t segment_samples;
 static uint16_t eval_interval; 
 static uint16_t eval_step; 
 static uint16_t current_sample_restriction;
+bool has_threshold = false; // threshold flag
 
 static circbuf_t *raw_buffer; 
 static circbuf_t *smooth_buffer;
@@ -29,6 +30,7 @@ void fResp_init(void) {
     segment_samples = lrintf(segment_duration * FS);
     eval_interval = 2; // seconds
     eval_step = lrintf(eval_interval * FS);
+    current_sample_restriction = lrintf(5.0f * FS);
 
     raw_buffer = create_buffer(smooth_win);
     smooth_buffer = create_buffer(center_win);
@@ -79,6 +81,57 @@ void processed_signal(float new_point, float *smp, float *cp)// circbuf_t *raw_b
     // end
     *cp = smoothed_point - baseline;
 
+}
+
+
+/**
+ * Find zero crossings in a signal
+ * function [clean_crossings, valid_crossings, breaths_per_second,crossing_start_idx, crossing_end_idx] 
+ *      = calculateRespFreqZerosCross_Ver2_online(centered_buffer,sample_restriction,slope_window, fs, amplitude_threshold)
+ */
+// void zeros_crossings(circbuf_t *c_b)//, uint16_t size, uint16_t *crossings, uint16_t *num_crossings)
+void zeros_crossings(void)//circbuf_t *c_b)
+{   
+    /*
+     * % Step 1: Detect raw zero crossings
+     * product = signal(1:end-1) .* signal(2:end);
+     * raw_crossings = find(product <= 0);
+     */
+
+    /*for debugging*/
+    circbuf_t *c_b = centered_buffer;
+    c_b->size = 10;
+    c_b->tail = 3;
+    for (uint16_t i = 0; i < (c_b->size); i++) {
+        c_b->buffer[i] = (float)i; // Example data, replace with actual signal data
+        printf("Buffer[%d]: %f\n", i, c_b->buffer[i]);
+    }
+    /*------------*/
+    
+    uint16_t i;
+    float product[(c_b->size)-1];
+    for (i = 0; i < (c_b->size)-1; i++) {
+        product[i] = c_b->buffer[(i + c_b->tail)%c_b->size] 
+                   * c_b->buffer[(i + c_b->tail + 1)%c_b->size];
+    }
+
+    uint16_t raw_crossings[(c_b->size)%100];
+    uint16_t num_crossings = 0;
+
+    /*for debugging*/
+    for (uint16_t i = 0; i < (c_b->size-1); i++) {
+       printf("Product[%d]: %f\n", i, product[i]);
+    }
+    /*------------*/
+
+    // *num_crossings = 0;
+    // for (uint16_t i = 1; i < size; i++) {
+    //     if ((data[i-1] < 0 && data[i] >= 0) || (data[i-1] > 0 && data[i] <= 0)) {
+    //         crossings[*num_crossings] = i;
+    //         (*num_crossings)++;
+    //         if (*num_crossings >= size) break; // Prevent overflow
+    //     }
+    // }
 }
 
 void rfrec(float data_value)

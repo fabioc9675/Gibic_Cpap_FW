@@ -15,7 +15,7 @@
 
 
 struct Datos_usd{
-    uint16_t bldc;
+    int16_t bldc;
     int16_t praw;  // sensor raw presion
     float presion; // sensor presion
     float presionfl; // sensor filtrada presion

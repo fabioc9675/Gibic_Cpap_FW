@@ -71,9 +71,9 @@ TaskHandle_t thBldcApp = NULL;
 uint8_t flProcSen = 0; //flag para procesar sensores se stea en 1 cuando hay datos nuevos
 uint8_t setPointPresion = 4;
 
-//todo: verificar si el timestamp esta en segundos o milisegundos.
 
-uint16_t bldc_sp = 100;
+
+int16_t bldc_sp = 1;
 uint8_t flag_bldc = 0;
 uint8_t spbldctemp = 0;
 
@@ -137,6 +137,8 @@ void app_main(void)
     filter_t *fl_press = filter_create(3);
     filter_t *fl_flow = filter_create(3);
     fResp_init();
+    //zeros_crossings();
+
     
     for(;;)
     {   
@@ -203,9 +205,18 @@ void app_main(void)
                 
             case initbldc:
                 //init queue and task bldc
-                bldc_App_queue = xQueueCreate(10, sizeof(uint16_t));
+                bldc_App_queue = xQueueCreate(10, sizeof(int16_t));
                 xTaskCreate(bldc_servo_app, "bldc_servo_app", 4096, NULL, 10, &thBldcApp);
                 msEstados = initCpap;
+
+                /**
+                 * temporarily start the bldc
+                 */
+                struct ToUartData touartdata;
+                touartdata.command = UPresion;
+                touartdata.value = (int8_t)setPointPresion;
+                xQueueSend(uart_app_queue_rx, &touartdata,0);
+
                 break;
 
             case initCpap:
@@ -257,7 +268,7 @@ void app_main(void)
             
             case bldcoff:
                 //turn off bldc
-                bldc_sp = 0;
+                bldc_sp = -1; //inidcamos apagar
                 xQueueSend(bldc_App_queue, &bldc_sp, 0);
                 vTaskDelay(15);
                 // wait until queue empty
@@ -270,6 +281,9 @@ void app_main(void)
                 killTask(&thSdApp);
                 killTask(&thI2CApp);
                 killTask(&thBldcApp);
+                vQueueDelete(i2c_App_queue);
+                vQueueDelete(bldc_App_queue);
+                vQueueDelete(sd_App_queue);
                 msEstados = idle;
                 break;
      
