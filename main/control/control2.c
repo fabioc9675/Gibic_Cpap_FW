@@ -1,37 +1,53 @@
 #include "control.h"
+#include "lut.h"
 #ifdef control2
-
-//static filter_t *fl_dif = NULL; // Declaración global
 
 /* ---------- Compile‑time configuration ---------- */
 #define SAMPLE_HZ          100.0f          // Control loop frequency (Hz)
 #define DT                 (1.0f/SAMPLE_HZ)
 
-/* ---------- Pneumatic model (nominal) ---------- */
-static const float Ku        = 0.256f;//0.1796f;      // (L s⁻¹)/(% PWM)1.796f; 90.0 supone un dead band de 10%
+/* ------------ Turbine model (nominal) ------------ */
+//Qt(u,p) = KTU*u - KTP*p
+#define KTU         1.468543f    // Ktu
+#define KTP         3.692028f    // Ktp
 
-static const float C_L       = 0.30f;      // Compliance (L/cmH₂O)     // 0.8f
-static const float R_aw      = 1.0f;       // Airway resistance ((cmH₂O·s)/L)    // 3.0f
-static const float kL        = 0.05f;      // Linear leak (L s⁻¹/cmH₂O)
-static const float tau       = (R_aw + kL) * C_L;   // Time constant 0.7625
+/*------------ Mask leak model ------------*/
+//Ql(p) = KLP*p + KLQ           1.547*p + 20.27
+//#define KLP    1.547f
+//#define KLQ    20.27f  // [L/min]
 
-/* IMC tuning (λ = 0.3 τ) */
-static const float lambda_imc = 0.3f * tau;
-static const float Kc         = (0.50f * tau) / (lambda_imc * Ku * C_L);//0.5
-static const float Ti         = 3.0f * tau;                 // 3 Integrator time
-static const float Kd         = 0.01f * Kc * Ti;           // Derivative gain if desired
+/*------------Controller terms------------*/
+// --gain values
+#define Kpp   4.5f           //1.0f           // Pressure proportional gain
+#define Kpi   0.5f           // 1.0f           // Pressure Integral gain
+#define Kpd   0.2f          //0.08f           // Pressure Derivative gain
+#define Kfpi  0.35f          //1/Ktu             // Flow proportional inspiration gain
+#define Kfpe  0.45f          //0.45f          // Flow proportional expiration gain
 
-/* ---------- Globals ---------- */
-static volatile float PEAP_cmH2O  = 0.0f;      // Ambient gauge reference
-/* Control state */
-static float error = 0.0f;
-static float e_prev = 0.0f; // Previous error for derivative
-static float p_prev = 0.0f; // Previous pressure for derivative
-static float uff = 0.0f;            // feedforward term
-static float up = 0.0f;            // Proportional term
-static float ui = 0.0f;            // Integrator term
-static float ud = 0.0f;            // Derivative term
-static float ud_m[5] = {0.0f};     // mean derivative vector
+// --vars
+float uff = 0.0f;            // feedforward term
+float upp = 0.0f;            // Proportional pressure term
+float ufp = 0.0f;            // Proportional flow term
+float upi = 0.0f;            // Integrator pressure term
+float upd = 0.0f;            // Derivative pressure term
+float u = 0.0f;              // output term
+float p_prev = 0.0f;         // previous pressure term
+float q_prev = 0.0f;         // previous flow term
+//float Qpi = 0.0f;            // patient flow
+//float Qpe = 0.0f;          // patient flow
+
+/*------- Constraints -------*/
+//#define COR_D_S     6.0f    // no bajar más de 8 pts PWM por debajo de uff
+#define COR_D      35.0f    // no bajar más de 8 pts PWM por debajo de uff
+#define COR_U      35.0f    // no subir más de 15 por encima
+#define UFP_D      25.0f    // flujo sólo puede quitar 6 pts PWM
+#define UFP_U      25.0f    // y añadir 6 pts como máximo
+
+// Gating de la integral
+#define I_MIN           2.0f    // Límite absoluto de la integral
+#define I_MAX           2.0f    // Límite absoluto de la integral
+
+uint8_t flag =0;
 
 /* ---------- Helper functions ---------- */
 static inline float clamp(float x, float lo, float hi)
@@ -48,64 +64,94 @@ static inline float clamp(float x, float lo, float hi)
  */
 int16_t controller(uint8_t setpointPresion, float presion, float flow)
 {
-    float u = 0.0f;           // Control signal
-    error = setpointPresion - presion;
+    // Calculamos fuga en mascara en ss
+    //float Ql_sp = KLP * setpointPresion + KLQ; // leak flow at setpoint
+    float Ql_sp = lookup_table_get(&lut_p, (float)setpointPresion); // leak flow at setpoint from LUT
+    // error pression
+    float ep = ((float)setpointPresion - presion);
+        
+    // calculamos u para llevar a presion setpoint en ss
+    uff = (Ql_sp + (KTP * setpointPresion))/KTU;
 
-    // Feedforward term
-    //uff = 35;
-
-    // Proportional term
-    up = Kc * error;
-    
-    // Integral term
-    //float u_unsat = up + ui + ud;
-    //float u_sat   = clamp(u_unsat, 5.0f, 100.0f);
-    ui += (Kc*DT/Ti)*error;// + (DT/(Ti/Kc))*(u_sat - u_unsat);
-    ui = clamp(ui, -25.0f, 25.0f);            // Anti‑windup
-
-    // Derivative term
-    // ud = 0.0f * Kd;
-    ud = Kd * (p_prev - presion) / DT;
-    //float median(float *data, float new_value, uint8_t size);
-    ud = median(ud_m, ud, 5);
-    
-    // Combine terms
-    u = uff + up + ui + ud;
-
-    // diff_fl = flow - tmp;
-    // ddiff_fl = (diff_fl - diff_fl_p) / DT;
-    // ddiff_fl = median(diff_fl_m, ddiff_fl, 5);
-    // if (error > 0){ //presion por debajo del sp
-    //     if ((diff_fl <= -3.0f) && (ddiff_fl <= -5.0f))
-    //     {
-    //          u = 2.0f; 
-    //     } 
-    // }
-    
-    // if(!flag){
-    //     if((diff_fl < -1.5f) && ((error > 0.0f) && (error < 0.8f))) {
-    //         printf("hola mundo\n");
-    //         ui /= 2.0f;
-    //         up /= 2.0f;
-    //         flag = 1;
+    // compensacion fuerte por flujo
+    // estimacion flujo paciente
+    // float Ql_pr = KLP * presion + KLQ; // fugas mascara presion actual
+    float Ql_pr = lookup_table_get(&lut_p, presion); // leak flow at current pressure from LUT
+    float Qp = flow - Ql_pr;           // flujo paciente actual 
+    //float Qp = flow - Ql_sp;
+    //if (fabs(ep) < 0.5f){
+    //    ufp = 0.0f;
+   // } else
+    // if ((Qp > 0.0f || q_prev < Qp ) && ep > 0.0f){  // INSPIRACION
+    //     if (fabsf(Qp) < 10.0f){
+    //        // Qp = 10.0f;
+    //     }
+    //     Qpe = 0.0f;
+    //     ufp = Kfpi * (fabsf(Qp)); // inspiracion, presion por debajo de setpoint
+    // } else if ((Qp < 0.0f || q_prev > Qp) && ep < 0.0f){ // EXPIRACION
+    //     if(Qpe == 0.0f){
+    //         Qpe = fabsf(Qp);
+    //     }
+    //     if(Qpe > fabsf(Qp)){
+    //         ufp = -Kfpe * (Qpe + fabsf(Qp)); 
+    //     }else{
+    //         ufp = -Kfpe * (fabsf(Qp));
     //     }
     // }else{
-    //     ui /= 2.0f;
-    //     up /= 2.0f;
-    //     if (error < 0){
-    //         flag = 0;
-    //     }
+    //     ufp = 0.0f;
     // }
+    if (Qp > 0.0f){ // inspiracion
+        //if (ep >= 0.0f){
+            ufp = Kfpi * Qp;
+        //}else{
+       //     ufp = 0.0f;
+      // }
+    }else{ // expiracion
+        //if(ep <= 0.0f){
+            ufp = Kfpe * Qp;
+       // }else{
+            //ufp = 0.0f;
+       // }
+    }
+    ufp = clamp(ufp, -UFP_D, UFP_U);
+    q_prev = Qp;
+    
+    // PID pressure controller
+    // Proportional term
+    upp = Kpp * ep ;    
 
-
-    /* === Actuator saturation & apply === */
-    u = clamp(u, 3.0f, 100.0f);
-    e_prev = error;
+    // Derivative term
+    float dp_dt = (presion - p_prev) / DT;
+    upd = Kpd * (-dp_dt);
     p_prev = presion;
 
-    //printf("> P:%f, U:%f, Up:%f, Ui:%f, Ud:%f\n",presion, (u/10.0f), up, ui, ud);
-    // printf("> P:%f, U:%f, Up:%f, Ui:%f, Ud:%f,",presion, (u/10.0f), up, ui, ud);
-    // printf("FL:%f \n",flow);
+    // Integral term
+    float u_cor = 0.0f;
+    if ((fabsf(ep) < 1.2f)){
+        upi += Kpi * ep * DT;
+        upi = clamp(upi, -I_MIN, I_MAX);
+        if (fabsf(ep) < 0.5f){
+            u_cor = upp + upi + upd + ufp;    
+        }else{
+            u_cor = upp + upd + ufp; 
+        }  
+    }else{
+        u_cor = upp + upd + ufp; 
+    }
+    //u_cor = upp + upi + upd + ufp;
+    u_cor = clamp(u_cor, -COR_D, COR_U);
+
+    u = uff + u_cor;
+    u = clamp(u, 3.0f, 100.0f);
+    
+//printf("> P:%f, U:%f, Up:%f, Ui:%f, Ud:%f\n",presion, (u/10.0f), up, ui, ud);
+//     // printf("> P:%f, U:%f, Up:%f, Ui:%f, Ud:%f,",presion, (u/10.0f), up, ui, ud);
+//     // printf("FL:%f \n",flow);
+    flag = !flag;
+    if (flag){
+        printf("> P:%0.2f, Q:%0.2f, Qp:%0.2f, U:%0.2f, uff:%0.2f, ucor:%0.2f, upp:%0.2f, upi:%0.2f, upd:%0.2f, ufp:%0.2f \n",
+            presion, flow, Qp, (u/1.0f), uff, u_cor, upp, upi, upd, ufp);
+    }        
     return (uint16_t)lrintf(u * 10.0f); // Return PWM value in [0, 1000]
 }
 
