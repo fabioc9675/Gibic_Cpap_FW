@@ -57,75 +57,48 @@ esp_err_t xSdp810Init(void){
     ret = i2c_master_bus_add_device(I2C1_bus_handle, &sdp810_conf.conf, 
                                     &sdp810_conf.handle);
 
-    #ifdef DEBUG
-        printf("init sdp810 %s\n", ret == ESP_OK ? "success" : "failed");
-    #endif
-
     Command command = COMMAND_STOP_CONTINOUS_MEASUREMENT;
-    #ifdef DEBUG
-        printf("execute command: %04x\n",command);
-    #endif
+
     sdp810Buf[0] = command >> 8;
     sdp810Buf[1] = command & 0xFF;
     ret = i2c_master_transmit(sdp810_conf.handle, 
                               sdp810_conf.buff,2, -1);
-    #ifdef DEBUG
-        printf("stop command: %s\n", ret == ESP_OK ? "success" : "failed");
-    #endif
+  
     return ret;
 }
 
 /**
  * @brief Starts the continous mesurement with the specified settings.
  */
+
+ // @todo revisar error en la comunicacion 
 esp_err_t xSdp810_StartContinousMeasurement(Sdp800TempComp tempComp,
                                             Sdp800Averaging averaging){
-    esp_err_t ret;
+    esp_err_t ret = ESP_FAIL;
+    //static uint8_t count = 0;
     Command command = COMMAND_UNDEFINED;
-    
-    #ifdef DEBUG
-        printf("tempcomp: %d\n",tempComp);
-        printf("averaging: %d\n",averaging);
-    #endif
+
     // determine command code
     switch(tempComp) {
         case SDP800_TEMPCOMP_MASS_FLOW:
-        #ifdef DEBUG
-            printf("SDP800_TEMPCOMP_MASS_FLOW\n");
-        #endif
             switch(averaging){
                 case SDP800_AVERAGING_TILL_READ:
-                    #ifdef DEBUG
-                        printf("SDP800_AVERAGING_TILL_READ\n");
-                    #endif
                     command = COMMAND_START_MEASURMENT_MF_AVERAGE;
-                    break;
+                    break;  
         
                 case SDP800_AVERAGING_NONE:
-                    #ifdef DEBUG
-                        printf("SDP800_AVERAGING_NONE\n");
-                    #endif
                     command = COMMAND_START_MEASURMENT_MF_NONE;
                     break;
             }
             break;
     
         case SDP800_TEMPCOMP_DIFFERNTIAL_PRESSURE:
-        #ifdef DEBUG
-            printf("SDP800_TEMPCOMP_DIFFERNTIAL_PRESSURE\n");
-        #endif
             switch(averaging) {
                 case SDP800_AVERAGING_TILL_READ:
-                    #ifdef DEBUG
-                        printf("SDP800_AVERAGING_TILL_READ\n");
-                    #endif
                     command = COMMAND_START_MEASURMENT_DP_AVERAGE;
                     break;
         
                 case SDP800_AVERAGING_NONE:
-                    #ifdef DEBUG
-                        printf("SDP800_AVERAGING_NONE\n");
-                    #endif
                     command = COMMAND_START_MEASURMENT_DP_NONE;
                     break;
             }
@@ -133,18 +106,16 @@ esp_err_t xSdp810_StartContinousMeasurement(Sdp800TempComp tempComp,
     }
   
     if(COMMAND_UNDEFINED != command) {
-        #ifdef DEBUG
-            printf("execute command: %04x\n",command);
-        #endif
         sdp810Buf[0] = command >> 8;
         sdp810Buf[1] = command & 0xFF;
+        ret = i2c_master_bus_reset(I2C1_bus_handle);
         ret = i2c_master_transmit(sdp810_conf.handle, 
                               sdp810_conf.buff,2, -1);
         //ret = xExecuteCommand(command);
     } else {
         ret = ESP_ERR_INVALID_ARG;
-    }
-  
+   }
+    //printf("execute command: %04X, count: %d\n",ret, count++);
     return ret;
 }
 
@@ -160,7 +131,9 @@ esp_err_t xSdp810_ReadMeasurementResults(float *diffPressure, float *temperature
     
     ret = xReadMeasurementRawResults(&diffPressureTicks, &temperatureTicks,
                                     &scaleFactorDiffPressure);
+    
     #ifdef DEBUG
+        printf("error %04x \n", ret);                                        
         printf("diffPressureTicks: %d\n",diffPressureTicks);
         printf("temperatureTicks: %d\n",temperatureTicks);
         printf("scaleFactorDiffPressure: %d\n",scaleFactorDiffPressure);
@@ -250,5 +223,5 @@ float get_flow(float fraw, float offset) {
         flow = 0.0;
     }
 
-    return flow;
+    return flow - offset;
 }

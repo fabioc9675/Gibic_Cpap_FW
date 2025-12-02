@@ -64,7 +64,7 @@ void uart_app(void *pvParameters)
     changeToPage(50); // Cambia a la pagina 0
     //writeDWIN(PRESION_REG, 4);
     writeDWIN(PRESION_ACT,4); // Valor inicial de presion objetivo
-    initScreen();
+    //initScreen();
     
     for (;;)
     {

@@ -5,7 +5,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#define FS   100.0f  // Sample frequency in Hz
+#define FS   200.0f  // Sample frequency in Hz
 #define DT   (1.0f/FS) // Sample period in seconds
 
 typedef struct {

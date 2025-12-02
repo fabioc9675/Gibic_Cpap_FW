@@ -74,13 +74,14 @@ void i2c_app(void *pvParameters)
     float sdptemperatura = 0;
 
     //init sdp810
-    if(ESP_OK !=xSdp810Init())
-    {
-        #ifdef DEBUG
-            printf("error en sdp810\n");
-        #endif
-    };
+    (void)xSdp810Init();
     
+    ret = ESP_FAIL;
+    while(ESP_OK != ret){
+        ret = xSdp810_StartContinousMeasurement(SDP800_TEMPCOMP_MASS_FLOW, SDP800_AVERAGING_TILL_READ);
+        //printf("error start continuos sdp810 %d \n", ret);
+    }
+
     //init adc
     (void)i2c_adc1015_init();
 
@@ -90,16 +91,21 @@ void i2c_app(void *pvParameters)
     while (ret != ESP_OK) {
        ret = i2c_adc1015_read_ch(&adc);    
     }
-    offsetPresion = get_pressure(adc, 0); 
-    // ESP_LOGI("I2C_APP", "offset presion raw: %d", adc);
-    // ESP_LOGI("I2C_APP", "offset presion: %f", offsetPresion);
-    //offsetPresion = (float)(((adc)/(0.2*3000))-1);
 
-    if(ESP_OK !=xSdp810_StartContinousMeasurement(SDP800_TEMPCOMP_MASS_FLOW, SDP800_AVERAGING_TILL_READ)){
-        #ifdef DEBUG
-        printf("error start continuos sdp810\n");
-        #endif
-    };
+    offsetPresion = get_pressure(adc, 0); 
+    ESP_LOGI("I2C_APP", "offset presion: %0.2f", offsetPresion);
+
+    uint64_t timenow = esp_timer_get_time();
+    while (timenow + 3000 > esp_timer_get_time());
+
+    //leemos offset flujo
+    ret = ESP_FAIL;
+    while(ESP_OK != ret){
+        ret = xSdp810_ReadMeasurementResults(&sdppresiondiff, &sdptemperatura);
+        printf("error read sdp810 %d \n", ret);
+    }
+    offsetFlujo = get_flow (sdppresiondiff, 0);
+    ESP_LOGI("I2C_APP", "offset flujo: %0.2f", offsetFlujo);
     
     for(;;) 
     {
@@ -119,7 +125,7 @@ void i2c_app(void *pvParameters)
 
             case st_rsdp810: //read sdp810
                 (void)xSdp810_ReadMeasurementResults(&sdppresiondiff, &sdptemperatura);
-                sdppresiondiff -= offsetFlujo;
+                //sdppresiondiff -= offsetFlujo;
                 datos.fraw = sdppresiondiff;
                 datos.tempFlujo = sdptemperatura;
                 // de acuerdo a la caracterizacion de la sdp810
@@ -147,7 +153,7 @@ void i2c_app(void *pvParameters)
                 xQueueSend(i2c_App_queue, &datos, 0);
                 i2c_state = st_reqAdc0;
                 //ESP_LOGI("I2C_APP", "fin adc");                
-                vTaskDelayUntil(&xLastWakeTime, 10 / portTICK_PERIOD_MS);
+                xTaskDelayUntil(&xLastWakeTime, 10 / portTICK_PERIOD_MS);
                 break;
 
             default:

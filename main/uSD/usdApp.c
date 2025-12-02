@@ -80,7 +80,7 @@ void sd_App(void *pvParameters){
                 fclose(f);
             }
         }
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        vTaskDelay(4 / portTICK_PERIOD_MS);
     }
 }
 

@@ -13,7 +13,7 @@
 #include "esp_err.h"
 #include "filter.h"
 
-//#define control1
+//#define control1 control2
 #define control2
 
  /**

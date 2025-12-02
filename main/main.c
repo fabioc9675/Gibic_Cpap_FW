@@ -14,6 +14,7 @@
 #include "uart/uartapp.h"
 #include "control/control.h"
 #include "control/filter.h"
+#include "control/lut.h"
 #include "proc/fResp.h"
 
 #include "wifi/wifiserver.h"
@@ -127,6 +128,7 @@ void app_main(void)
     esp_event_loop_create_default();
     init_sdmmc();
     I2C1_init();
+    init_lut_p();
     
     /**
      * LCD comunicatins queeue and task
@@ -238,8 +240,8 @@ void app_main(void)
                     lp_filter(fl_flow, datos_i2c.flujo, &datos_usd.flujofl);
                     
                     // process pid control
-                    //bldc_sp = controller(setPointPresion, datos_i2c.presion, datos_i2c.flujo);
-                    bldc_sp = controller(setPointPresion, datos_usd.presionfl, datos_usd.flujofl);
+                    bldc_sp = controller(setPointPresion, datos_i2c.presion, datos_i2c.flujo);
+                    //bldc_sp = controller(setPointPresion, datos_usd.presionfl, datos_usd.flujofl);
                     
                     xQueueSend(bldc_App_queue, &bldc_sp, 0);
                     
@@ -252,16 +254,19 @@ void app_main(void)
                     //datos_usd.pdata = 0;
                     //datos_usd.fl1 = 0;
                     //datos_usd.fl2 = 0;  
-                    // printf(">BLDC:%0.2f,Flujofl:%.4f,Presfl:%.4f\r\n", 
+                    //printf(">BLDC:%0.2f,Flujofl:%.4f,Presfl:%.4f\r\n", 
                     //        (datos_usd.bldc/100.0f),
                     //        //setPointPresion, 
                     //        datos_usd.flujofl, 
                     //        datos_usd.presionfl);   
+                    // ESP_LOGI("DATA CPAP","BLDC:%0.2f,Flujofl:%.4f,Presfl:%.4f", 
+                    //     (datos_usd.bldc/100.0f),
+                    //     datos_usd.flujofl,
+                    //     datos_usd.presionfl);
 
                     processed_signal(datos_usd.flujofl, &datos_usd.t_smp, &datos_usd.t_cp);
 
                     xQueueSend(sd_App_queue, &datos_usd, 0);
-                    //ESP_LOGI("SETPOINT","SETPOINT: %d", setPointPresion);
                 
                 }
                 break;

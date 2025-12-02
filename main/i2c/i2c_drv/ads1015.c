@@ -1,6 +1,10 @@
 #include "i2c/i2c_drv/i2c_common.h"
 
 uint8_t adc1015Buf[2]={0};
+static const char TAG[] = "adc1015";
+
+//local functions
+esp_err_t read_reg (uint8_t reg);
 
 i2c_adc1015_config_t adc1015_conf = {
     .conf.scl_speed_hz = I2C_FREQ_HZ,
@@ -18,32 +22,42 @@ esp_err_t i2c_adc1015_init(){
     esp_err_t ret;
     ret = i2c_master_bus_add_device(I2C1_bus_handle, &adc1015_conf.conf, 
                                     &adc1015_conf.handle);
-    //ESP_LOGI(TAG, "init adc1015_conf %s", ret == ESP_OK ? "success" : "failed");
-    /*  
-     * b11-b9 = 001   ±4.096V range
-     * b8     = 1     config single shot mode
-     * b7-b5  = 111   3300sps
-     * 
-     */ 
-    if (ret == ESP_OK){
+
+                                    if (ret == ESP_OK){
+        
+        uint64_t timenow;
+        
+        //escritura de configuracion
         adctemp[0] = 0x01; //puntero a configuracion
         adctemp[1] = 0x03;
         adctemp[2] = 0xE0;
      
-        //escritura de configuracion
-        ret = i2c_master_transmit( adc1015_conf.handle, 
-                                   adctemp,3, -1);
-        
-        //lectura de configuracion
-        adc1015_conf.p_addr = 0x01;
-        adc1015Buf[0] = 0;
-        adc1015Buf[1] = 0;
-       
-        ret = i2c_master_transmit_receive( adc1015_conf.handle, 
-                                       &adc1015_conf.p_addr,adc1015_conf.dl_p_addr,
-                                       adc1015_conf.buff, adc1015_conf.dl_r, -1);
-        //ESP_LOGI(TAG, "ADC1015 read data init: %02x,%02X", 
-        //    adc1015Buf[0],adc1015Buf[1]);
+        ret = i2c_master_transmit( adc1015_conf.handle, adctemp,3, -1);
+
+        //read_reg (0x01);
+
+        //escritura de Hi_thresh
+        timenow = esp_timer_get_time();
+        while (timenow + 400 > esp_timer_get_time()){
+            //espera de 0.4ms para la primera conversion
+        }
+        adctemp[0] = 0x03; //puntero a configuracion
+        adctemp[1] = 0x80;
+        adctemp[2] = 0x00;
+        ret = i2c_master_transmit( adc1015_conf.handle, adctemp,3, -1);
+        //read_reg (0x03);            
+
+        //escritura de Lo_thresh
+        timenow = esp_timer_get_time();
+        while (timenow + 400 > esp_timer_get_time()){
+            //espera de 0.4ms para la primera conversion
+        }
+        adctemp[0] = 0x02; //puntero a configuracion
+        adctemp[1] = 0x00;
+        adctemp[2] = 0x00;
+        ret = i2c_master_transmit( adc1015_conf.handle, adctemp,3, -1);
+        //read_reg (0x02);            
+
     }
 
     return ret;
@@ -115,11 +129,24 @@ esp_err_t i2c_adc1015_read_ch(int16_t *data){
     return ret;
 }
 
-
 float get_pressure(uint16_t adc_value, float offset) {
     // Convert ADC value to pressure in cmH2O
     // Assuming a linear conversion for demonstration purposes
     // Adjust the conversion factor as per your calibration
-    float pressure = (((adc_value / 600.0)-1)*10)- offset; 
-    return pressure;
+    float pressure = (((adc_value / 600.0)-1)*10); 
+    return pressure - offset;
+}
+
+esp_err_t read_reg (uint8_t reg){
+    esp_err_t ret;
+
+    //read reg
+    adc1015_conf.p_addr = reg;
+    adc1015Buf[0] = 0;
+    adc1015Buf[1] = 0;
+    ret = i2c_master_transmit_receive( adc1015_conf.handle, 
+                                       &adc1015_conf.p_addr,adc1015_conf.dl_p_addr,
+                                       adc1015_conf.buff, adc1015_conf.dl_r, -1);
+    ESP_LOGI(TAG, "ADC1015 read data init: %02x,%02X", adc1015Buf[0],adc1015Buf[1]);
+    return ret;
 }
