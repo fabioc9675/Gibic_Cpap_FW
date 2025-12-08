@@ -1,158 +1,119 @@
 #include "control.h"
 #include "lut.h"
+#include <math.h> 
+
 #ifdef control2
 
-/* ---------- Compile‑time configuration ---------- */
-#define SAMPLE_HZ          100.0f          // Control loop frequency (Hz)
-#define DT                 (1.0f/SAMPLE_HZ)
+/* ---------- Configuración ---------- */
+#define SAMPLE_HZ          100.0f
+#define DT                 0.01f
 
-/* ------------ Turbine model (nominal) ------------ */
-//Qt(u,p) = KTU*u - KTP*p
-#define KTU         1.468543f    // Ktu
-#define KTP         3.692028f    // Ktp
+/* ------------ Modelo Turbina ------------ */
+#define KTU         1.468543f 
+#define KTP         3.692028f
 
-/*------------ Mask leak model ------------*/
-//Ql(p) = KLP*p + KLQ           1.547*p + 20.27
-//#define KLP    1.547f
-//#define KLQ    20.27f  // [L/min]
+/*------------ Ganancias PID (Reajuste Estratégico) ------------*/
+#define Kpi   10.0f           
 
-/*------------Controller terms------------*/
-// --gain values
-#define Kpp   4.5f           //1.0f           // Pressure proportional gain
-#define Kpi   0.5f           // 1.0f           // Pressure Integral gain
-#define Kpd   0.2f          //0.08f           // Pressure Derivative gain
-#define Kfpi  0.35f          //1/Ktu             // Flow proportional inspiration gain
-#define Kfpe  0.45f          //0.45f          // Flow proportional expiration gain
+// CAMBIO SOLICITADO: Bajamos la ganancia derivativa de presión.
+// Ya no necesitamos que sea tan agresiva porque la derivada de flujo (KdQ)
+// está haciendo el trabajo pesado de anticipación.
+// Esto eliminará la oscilación nerviosa en 'upd'.
+#define Kpd   4.0f            // Antes 10.0
 
-// --vars
-float uff = 0.0f;            // feedforward term
-float upp = 0.0f;            // Proportional pressure term
-float ufp = 0.0f;            // Proportional flow term
-float upi = 0.0f;            // Integrator pressure term
-float upd = 0.0f;            // Derivative pressure term
-float u = 0.0f;              // output term
-float p_prev = 0.0f;         // previous pressure term
-float q_prev = 0.0f;         // previous flow term
-//float Qpi = 0.0f;            // patient flow
-//float Qpe = 0.0f;          // patient flow
+/*------------ Ganancias Proporcionales Dinámicas ------------*/
+#define Kpp_BASE    4.0f      
+#define Kpp_BOOST   12.0f      
 
-/*------- Constraints -------*/
-//#define COR_D_S     6.0f    // no bajar más de 8 pts PWM por debajo de uff
-#define COR_D      35.0f    // no bajar más de 8 pts PWM por debajo de uff
-#define COR_U      35.0f    // no subir más de 15 por encima
-#define UFP_D      25.0f    // flujo sólo puede quitar 6 pts PWM
-#define UFP_U      25.0f    // y añadir 6 pts como máximo
+/*------------ Anticipación de Flujo (El Nuevo "Líder") ------------*/
+// Mantenemos esta ganancia. Ahora es el actor principal para la respuesta rápida.
+#define KdQ   0.30f   
 
-// Gating de la integral
-#define I_MIN           2.0f    // Límite absoluto de la integral
-#define I_MAX           2.0f    // Límite absoluto de la integral
+/*------------ FILTROS DE RUIDO ------------*/
+// Mantenemos los filtros altos para asegurar suavidad total.
+#define D_FILTER_ALPHA  0.90f 
+#define Q_FILTER_ALPHA  0.90f  
 
-uint8_t flag =0;
+/*------------ Límites Integrador ------------*/
+#define PWM_MAX_INTEGRAL_POS  30.0f 
+#define PWM_MAX_INTEGRAL_NEG  0.0f   
 
-/* ---------- Helper functions ---------- */
-static inline float clamp(float x, float lo, float hi)
-{
+#define I_LIMIT_POS     (PWM_MAX_INTEGRAL_POS / Kpi)
+#define I_LIMIT_NEG     (PWM_MAX_INTEGRAL_NEG / Kpi)
+
+/*------------ Límites Actuador ------------*/
+#define U_MIN   1.0f 
+#define U_MAX   100.0f
+
+uint8_t flag = 0;
+// Variables estáticas para los filtros
+static float last_pressure = 0.0f; 
+static float dp_filtered = 0.0f; 
+
+static float last_flow = 0.0f;
+static float dq_filtered = 0.0f;
+
+static inline float clamp(float x, float lo, float hi) {
     return (x < lo) ? lo : (x > hi) ? hi : x;
 }
 
-/**
- * Controller function
- * @param setpointPresion: Desired pressure setpoint
- * @param presion: Current pressure reading
- * @param flow: Current flow reading
- * @return PWM value for the BLDC motor
- */
 int16_t controller(uint8_t setpointPresion, float presion, float flow)
 {
-    // Calculamos fuga en mascara en ss
-    //float Ql_sp = KLP * setpointPresion + KLQ; // leak flow at setpoint
-    float Ql_sp = lookup_table_get(&lut_p, (float)setpointPresion); // leak flow at setpoint from LUT
-    // error pression
+    float u = 0.0f;
+    static float integral = 0.0f;
+    
+    // 1. FEEDFORWARD
+    float flow_ff = (flow < 0.0f) ? 0.0f : flow;
+    float uff = (flow_ff + (KTP * (float)setpointPresion)) / KTU;
+    
+    // 2. ANTICIPACIÓN DE FLUJO (El Motor Principal de Reacción)
+    float dq_raw = (flow - last_flow) / DT;
+    // Filtro suave
+    dq_filtered = (Q_FILTER_ALPHA * dq_filtered) + ((1.0f - Q_FILTER_ALPHA) * dq_raw);
+    last_flow = flow;
+    
+    float u_anticipacion = KdQ * dq_filtered;
+
+    // 3. ERROR
     float ep = ((float)setpointPresion - presion);
-        
-    // calculamos u para llevar a presion setpoint en ss
-    uff = (Ql_sp + (KTP * setpointPresion))/KTU;
+            
+    // 4. PROPORCIONAL DINÁMICO
+    float current_Kpp = Kpp_BASE + (fabsf(ep) * Kpp_BOOST);
+    float upp = current_Kpp * ep;    
 
-    // compensacion fuerte por flujo
-    // estimacion flujo paciente
-    // float Ql_pr = KLP * presion + KLQ; // fugas mascara presion actual
-    float Ql_pr = lookup_table_get(&lut_p, presion); // leak flow at current pressure from LUT
-    float Qp = flow - Ql_pr;           // flujo paciente actual 
-    //float Qp = flow - Ql_sp;
-    //if (fabs(ep) < 0.5f){
-    //    ufp = 0.0f;
-   // } else
-    // if ((Qp > 0.0f || q_prev < Qp ) && ep > 0.0f){  // INSPIRACION
-    //     if (fabsf(Qp) < 10.0f){
-    //        // Qp = 10.0f;
-    //     }
-    //     Qpe = 0.0f;
-    //     ufp = Kfpi * (fabsf(Qp)); // inspiracion, presion por debajo de setpoint
-    // } else if ((Qp < 0.0f || q_prev > Qp) && ep < 0.0f){ // EXPIRACION
-    //     if(Qpe == 0.0f){
-    //         Qpe = fabsf(Qp);
-    //     }
-    //     if(Qpe > fabsf(Qp)){
-    //         ufp = -Kfpe * (Qpe + fabsf(Qp)); 
-    //     }else{
-    //         ufp = -Kfpe * (fabsf(Qp));
-    //     }
-    // }else{
-    //     ufp = 0.0f;
-    // }
-    if (Qp > 0.0f){ // inspiracion
-        //if (ep >= 0.0f){
-            ufp = Kfpi * Qp;
-        //}else{
-       //     ufp = 0.0f;
-      // }
-    }else{ // expiracion
-        //if(ep <= 0.0f){
-            ufp = Kfpe * Qp;
-       // }else{
-            //ufp = 0.0f;
-       // }
-    }
-    ufp = clamp(ufp, -UFP_D, UFP_U);
-    q_prev = Qp;
+    // 5. DERIVATIVO DE PRESIÓN (El Amortiguador)
+    float dp_raw = (presion - last_pressure) / DT;
+    // Filtro suave
+    dp_filtered = (D_FILTER_ALPHA * dp_filtered) + ((1.0f - D_FILTER_ALPHA) * dp_raw);
     
-    // PID pressure controller
-    // Proportional term
-    upp = Kpp * ep ;    
+    // Ahora 'upd' será mucho más pequeño y estable, actuando solo para evitar sobreimpulsos
+    float upd = -Kpd * dp_filtered;
+    last_pressure = presion; 
 
-    // Derivative term
-    float dp_dt = (presion - p_prev) / DT;
-    upd = Kpd * (-dp_dt);
-    p_prev = presion;
-
-    // Integral term
-    float u_cor = 0.0f;
-    if ((fabsf(ep) < 1.2f)){
-        upi += Kpi * ep * DT;
-        upi = clamp(upi, -I_MIN, I_MAX);
-        if (fabsf(ep) < 0.5f){
-            u_cor = upp + upi + upd + ufp;    
-        }else{
-            u_cor = upp + upd + ufp; 
-        }  
-    }else{
-        u_cor = upp + upd + ufp; 
-    }
-    //u_cor = upp + upi + upd + ufp;
-    u_cor = clamp(u_cor, -COR_D, COR_U);
-
-    u = uff + u_cor;
-    u = clamp(u, 3.0f, 100.0f);
+    // 6. INTEGRAL
+    float u_tentativa = uff + u_anticipacion + upp + upd + (Kpi * integral);
     
-//printf("> P:%f, U:%f, Up:%f, Ui:%f, Ud:%f\n",presion, (u/10.0f), up, ui, ud);
-//     // printf("> P:%f, U:%f, Up:%f, Ui:%f, Ud:%f,",presion, (u/10.0f), up, ui, ud);
-//     // printf("FL:%f \n",flow);
+    uint8_t saturado_max = (u_tentativa >= U_MAX && ep > 0);
+    uint8_t saturado_min = (u_tentativa <= U_MIN && ep < 0);
+    
+    if (!saturado_max && !saturado_min) {
+        integral += ep * DT;
+    }
+    
+    integral = clamp(integral, I_LIMIT_NEG, I_LIMIT_POS);
+    float upi = Kpi * integral;
+
+    // 7. SALIDA TOTAL
+    u = uff + u_anticipacion + upp + upi + upd;
+    u = clamp(u, U_MIN, U_MAX);
+
+    // 8. LOGGING
     flag = !flag;
     if (flag){
-        printf("> P:%0.2f, Q:%0.2f, Qp:%0.2f, U:%0.2f, uff:%0.2f, ucor:%0.2f, upp:%0.2f, upi:%0.2f, upd:%0.2f, ufp:%0.2f \n",
-            presion, flow, Qp, (u/1.0f), uff, u_cor, upp, upi, upd, ufp);
+        printf("> P:%.2f, Q:%.2f, U:%.2f, Kp:%.1f, upi:%.2f, upd:%.2f, udq:%.2f\n",
+                  presion, flow, u, current_Kpp, upi, upd, u_anticipacion); 
     }        
-    return (uint16_t)lrintf(u * 10.0f); // Return PWM value in [0, 1000]
+    return (uint16_t)lrintf(u * 10.0f); 
 }
 
-#endif // control2
+#endif
