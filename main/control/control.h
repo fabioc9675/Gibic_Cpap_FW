@@ -1,0 +1,27 @@
+#ifndef CONTROL_H
+#define CONTROL_H
+
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h> 
+#include <math.h>
+#include <stdbool.h>
+#include <sys/unistd.h>
+#include <sys/stat.h>
+#include "esp_log.h"
+#include "esp_err.h"
+#include "filter.h"
+
+//#define control1 control2
+#define control2
+
+ /**
+ * brief: Funcion para calcular el control PID
+ * param: setpointPresion: presion objetivo del sistema
+ * param: presion: presion actual del sistema
+ * return: salida del control PID
+ */
+int16_t controller(uint8_t setpointPresion, float presion, float flow);
+
+#endif // CONTROL_H

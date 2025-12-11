@@ -50,3 +50,11 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+#config files idf & vscode
+*.old
+.vscode/.espidf.peripherals.state.json
+.vscode/settings.json
+build/
+trace/
+
