@@ -78,10 +78,12 @@ esp_err_t update_system_time_from_ds1338(void){
     timeinfo.tm_mday = fromBCD(dds1338Buf[5]);
     
     //tm_mon is 0-11
-    timeinfo.tm_mon = fromBCD(dds1338Buf[6]);
+    timeinfo.tm_mon = fromBCD(dds1338Buf[6]) - 1;
+    // printf("Mes leido: %X\n", dds1338Buf[6]);
        
     //tm_year' is since 1900
     timeinfo.tm_year = fromBCD(dds1338Buf[7]) + 100;
+    // printf("Año leido: %X\n", dds1338Buf[7]);
     
     // 'mktime' set automatically daylight saving time
     timeinfo.tm_isdst = 0; 
@@ -91,6 +93,13 @@ esp_err_t update_system_time_from_ds1338(void){
     tv.tv_usec = 0;
 
     settimeofday(&tv, NULL);
+    ESP_LOGI("DS1338", "DATE: %04d-%02d-%02d %02d:%02d:%02d\n",
+        timeinfo.tm_year + 1900, // Año
+        timeinfo.tm_mon + 1,     // Mes (0-11, por eso se suma 1)
+        timeinfo.tm_mday,        // Día del mes
+        timeinfo.tm_hour,        // Hora
+        timeinfo.tm_min,         // Minutos
+        timeinfo.tm_sec);        // Segundos
     return ret;
 }
 

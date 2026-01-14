@@ -53,7 +53,7 @@ void print_task_list(void) {
 void task_monitor(void *pvParameters) {
     while(1) {
         print_task_stats();
-        //print_task_list();
+        print_task_list();
         vTaskDelay(pdMS_TO_TICKS(5000)); // Cada 5 segundos
     }
 }
@@ -71,8 +71,6 @@ TaskHandle_t thBldcApp = NULL;
  */
 uint8_t flProcSen = 0; //flag para procesar sensores se stea en 1 cuando hay datos nuevos
 uint8_t setPointPresion = 4;
-
-
 
 int16_t bldc_sp = 1;
 uint8_t flag_bldc = 0;
@@ -120,7 +118,7 @@ void killTask(TaskHandle_t *pxTaskHandle)
 //TaskHandle_t bldcTaskHandle = NULL; // Identificador para la tarea i2c_app
 void app_main(void)
 {
-    //xTaskCreate(task_monitor, "TaskMonitor", 4096, NULL, 5, NULL);
+    // xTaskCreate(task_monitor, "TaskMonitor", 4096, NULL, 5, NULL);
     /**
      * essential for the system
      */
@@ -135,7 +133,8 @@ void app_main(void)
      */
     uart_app_queue = xQueueCreate(10, sizeof(struct uartDataIn));
     uart_app_queue_rx = xQueueCreate(10, sizeof(struct ToUartData ));
-    xTaskCreate(uart_app, "uart_app", 4096, NULL, 10, &thUartApp);
+    //          xTaskCreate(uart_app, "uart_app", 4096, NULL, 10, &thUartApp);
+    xTaskCreatePinnedToCore(uart_app, "uart_app", 4096, NULL, 1, &thUartApp, APP_CPU_NUM);
     filter_t *fl_press = filter_create(3);
     filter_t *fl_flow = filter_create(3);
     fResp_init();
@@ -192,7 +191,8 @@ void app_main(void)
             case initfilesd:
                 //init queue and task sdcard
                 sd_App_queue = xQueueCreate(10, sizeof(struct Datos_usd));
-                xTaskCreate(sd_App, "sd_App", 4096, NULL, 10, &thSdApp);
+                // xTaskCreate(sd_App, "sd_App", 4096, NULL, 10, &thSdApp);
+                xTaskCreatePinnedToCore(sd_App, "sd_App", 4096, NULL, 1, &thSdApp, APP_CPU_NUM);
                 filter_init(fl_press, butn3, butd3);
                 filter_init(fl_flow, butn3, butd3);
                 msEstados = initSensors;//iniciar proceso
@@ -201,14 +201,16 @@ void app_main(void)
             case initSensors:
                 //init queue and task i2c
                 i2c_App_queue = xQueueCreate(10, sizeof(struct Datos_I2c));
-                xTaskCreate(i2c_app, "i2c_app", 4096, NULL, 10, &thI2CApp);
+                // xTaskCreate(i2c_app, "i2c_app", 4096, NULL, 10, &thI2CApp);
+                xTaskCreatePinnedToCore(i2c_app, "i2c_app", 4096, NULL, 2, &thI2CApp, PRO_CPU_NUM);
                 msEstados = initbldc;
                 break; 
                 
             case initbldc:
                 //init queue and task bldc
                 bldc_App_queue = xQueueCreate(10, sizeof(int16_t));
-                xTaskCreate(bldc_servo_app, "bldc_servo_app", 4096, NULL, 10, &thBldcApp);
+                // xTaskCreate(bldc_servo_app, "bldc_servo_app", 4096, NULL, 10, &thBldcApp);
+                xTaskCreatePinnedToCore(bldc_servo_app, "bldc_servo_app", 4096, NULL, 1, &thBldcApp, PRO_CPU_NUM);
                 msEstados = initCpap;
 
                 /**
@@ -223,7 +225,9 @@ void app_main(void)
 
             case initCpap:
                 struct Datos_usd datos_usd;
-                while(uxQueueMessagesWaiting(i2c_App_queue) > 0)
+                struct Datos_I2c datos_i2c;
+                //while(uxQueueMessagesWaiting(i2c_App_queue) > 0)
+                if (xQueueReceive(i2c_App_queue, &datos_i2c, portMAX_DELAY) == pdPASS)
                 { 
                     /**
                      * @todo: la cola de la sd debe complementarse con datos de los 
@@ -231,22 +235,26 @@ void app_main(void)
                      * aunque podria reutilizarse solo para encapsular los datos
                      * para el algoritmo de control
                      */
-                    struct Datos_I2c datos_i2c;
+                    
                     // get data from i2c
-                    xQueueReceive(i2c_App_queue, &datos_i2c, 0);
+                    //xQueueReceive(i2c_App_queue, &datos_i2c, 0);
 
                     // process low pass filter
                     lp_filter(fl_press, datos_i2c.presion, &datos_usd.presionfl);
                     lp_filter(fl_flow, datos_i2c.flujo, &datos_usd.flujofl);
                     
                     // process pid control
-                    bldc_sp = controller(setPointPresion, datos_i2c.presion, datos_i2c.flujo);
-                    //bldc_sp = controller(setPointPresion, datos_usd.presionfl, datos_usd.flujofl);
+                    //bldc_sp = controller(setPointPresion, datos_i2c.presion, datos_i2c.flujo);
+                    bldc_sp = controller(setPointPresion, datos_usd.presionfl, datos_usd.flujofl);
                     
-                    xQueueSend(bldc_App_queue, &bldc_sp, 0);
+                    //xQueueSend(bldc_App_queue, &bldc_sp, 5 / portTICK_PERIOD_MS);
+                    if (xQueueSend(bldc_App_queue, &bldc_sp, pdMS_TO_TICKS(5)) != pdPASS) {
+                        // Error: La tarea del motor está saturada
+                    }
                     
                     // data to sd
                     datos_usd.bldc = bldc_sp;
+                    datos_usd.presionfl -= lookup_table_get(&lut_p,setPointPresion);
                     //datos_usd.praw = datos_i2c.praw;
                     //datos_usd.presion = datos_i2c.presion;
                     //datos_usd.fraw = datos_i2c.fraw;
@@ -254,7 +262,7 @@ void app_main(void)
                     //datos_usd.pdata = 0;
                     //datos_usd.fl1 = 0;
                     //datos_usd.fl2 = 0;  
-                    //printf(">BLDC:%0.2f,Flujofl:%.4f,Presfl:%.4f\r\n", 
+                    // printf(">BLDC:%0.2f,Flujofl:%.4f,Presfl:%.4f\r\n", 
                     //        (datos_usd.bldc/100.0f),
                     //        //setPointPresion, 
                     //        datos_usd.flujofl, 
@@ -264,9 +272,10 @@ void app_main(void)
                     //     datos_usd.flujofl,
                     //     datos_usd.presionfl);
 
+                    datos_usd.presionfl -= lookup_table_get(&lut_p,setPointPresion);
                     processed_signal(datos_usd.flujofl, &datos_usd.t_smp, &datos_usd.t_cp);
 
-                    xQueueSend(sd_App_queue, &datos_usd, 0);
+                    xQueueSend(sd_App_queue, &datos_usd, pdMS_TO_TICKS(5));
                 
                 }
                 break;
@@ -303,7 +312,7 @@ void app_main(void)
                 break;
         }
 
-         vTaskDelay(1);
+         vTaskDelay(3);
          // vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }

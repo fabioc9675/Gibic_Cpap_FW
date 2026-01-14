@@ -1,11 +1,9 @@
 #include "lut.h"
 
-float x_values[] = { 4.0f,  6.0f,  8.0f, 10.0f, 12.0f,
-                    14.0f, 16.0f, 18.0f, 20.0f, 22.0f,
-                    24.0f, 26.0f, 28.0f, 30.0f}; // Entradas
-float y_values[] = {24.0f, 28.0f, 32.0f, 36.0f, 40.0f,
-                    43.0f, 47.0f, 50.0f, 53.0f, 55.0f,
-                    58.0f, 60.0f, 62.0f, 64.0f}; // Salidas
+float x_values[] = { 4.0f,  5.0f,  6.0f,  7.0f,  8.0f,  9.0f, 10.0f, 11.0f, 12.0f,
+                    13.0f, 14.0f, 15.0f, 16.0f, 17.0f, 18.0f, 19.0f, 20.0f}; // Entradas
+float y_values[] = {0.15f, 0.22f, 0.35f, 0.28f, 0.30f, 0.40f, 0.43f, 0.48f, 0.48f,
+                    0.52f, 0.62f, 0.70f, 0.70f, 0.80f, 0.73f, 0.85f, 0.82f}; // Salidas
 
 lookup_table_t lut_p;
 

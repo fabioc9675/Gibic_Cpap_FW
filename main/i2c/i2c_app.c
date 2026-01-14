@@ -150,10 +150,10 @@ void i2c_app(void *pvParameters)
 
             case st_iddle:
                 
-                xQueueSend(i2c_App_queue, &datos, 0);
+                xQueueSend(i2c_App_queue, &datos, pdMS_TO_TICKS(5));
                 i2c_state = st_reqAdc0;
                 //ESP_LOGI("I2C_APP", "fin adc");                
-                xTaskDelayUntil(&xLastWakeTime, 10 / portTICK_PERIOD_MS);
+                xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(10));
                 break;
 
             default:

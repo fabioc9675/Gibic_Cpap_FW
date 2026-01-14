@@ -8,23 +8,22 @@
 #define SAMPLE_HZ          100.0f
 #define DT                 0.01f
 
-/* ------------ Modelo Turbina ------------ */
-#define KTU         1.468543f 
-#define KTP         3.692028f
-
 /*------------ Ganancias PID ------------*/
 // Integral
-#define Kpi   25.0f          // 15 // 12.0f  Subimos un poco para recuperar más rápido
+#define Kpi   15.0f    
 
 // Derivativo 
-#define Kpd   0.045f           //0.045   0.9   1.8  Antes 1.5f  
+#define Kpd   1.5f           
 
 // Proporcionales 
-#define Kpp_BASE    6.0f     // 5
-#define Kpp_BOOST   1.0f    //25   10 
+#define Kpp_BASE    5.0f     
+#define Kpp_BOOST   10.0f 
 
-/*------------ Anticipación de Flujo ------------*/
-#define KdQ   0.02f   //0.2 0.35f
+/*------------ D de Flujo ------------*/
+#define KdQ  0.35f
+
+/*---------- Zona muerta ----------*/
+#define DEADZONE_PRESSURE 0.00f  //0.30f
 
 /*------------ FILTROS DE RUIDO ------------*/
 #define D_FILTER_ALPHA  0.94f 
@@ -41,8 +40,7 @@
 #define U_MIN   1.0f 
 #define U_MAX   100.0f
 
-/*---------- Zona muerta ----------*/
-#define DEADZONE_PRESSURE 0.00f  //0.30f
+
 // Variables estáticas para los filtros
 static float last_pressure = 0.0f; 
 static float dp_filtered = 0.0f; 
@@ -81,18 +79,18 @@ int16_t controller(uint8_t setpointPresion, float presion, float flow)
     float ufd = KdQ * dq_filtered;
 
     /*------------------ Veto UFD ------------------*/
-    //if(fabsf(ep)< DEADZONE_PRESSURE) { // Zona muerta para evitar oscilaciones
-    //    ufd = 0.0f;
-    //}
-    //else
-    // {
-    //     if (presion > (float)setpointPresion && ufd > 0.0f) {
-    //         ufd = 0.0f;
-    //     }
-    //     if (presion<(float)setpointPresion && ufd < 0.0f) {
-    //         ufd = 0.0f;
-    //     }
-    // }
+    if(fabsf(ep)< DEADZONE_PRESSURE) { // Zona muerta para evitar oscilaciones
+       ufd = 0.0f;
+    }
+    else
+    {
+        if (presion > (float)setpointPresion && ufd > 0.0f) {
+            ufd = 0.0f;
+        }
+        if (presion<(float)setpointPresion && ufd < 0.0f) {
+            ufd = 0.0f;
+        }
+    }
     ufd = clamp(ufd, -15.0f, 25.0f); // Limitar la influencia del ufd
         
     // 4. PROPORCIONAL DINÁMICO
@@ -108,11 +106,11 @@ int16_t controller(uint8_t setpointPresion, float presion, float flow)
     float dp_raw = (presion - last_pressure) / DT;
     dp_filtered = (D_FILTER_ALPHA * dp_filtered) + ((1.0f - D_FILTER_ALPHA) * dp_raw);
     float upd;
-    // if(fabsf(ep)<DEADZONE_PRESSURE){
-    //     upd = 0.0f;
-    // } else {
+    if(fabsf(ep)<DEADZONE_PRESSURE){
+        upd = 0.0f;
+    } else {
         upd = -Kpd * dp_filtered;
-    // }
+    }
     last_pressure = presion; 
 
     // 6. INTEGRAL

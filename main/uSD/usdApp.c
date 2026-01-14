@@ -125,6 +125,7 @@ void initfile(void){
     snprintf(file_log, sizeof(file_log), "/sd/%04d", 
         ((timeinfo.tm_year + 1900)%10000)
         );
+        // printf("%s \n",file_log);
     if (mkdir(file_log, 0777) == -1 && errno != EEXIST) {
         ESP_LOGE("SD_APP", "Error creating directory: %s", file_log);
     }
@@ -132,8 +133,9 @@ void initfile(void){
     // Create month directory if it doesn't exist
     snprintf(file_log, sizeof(file_log), "/sd/%04d/%02d", 
         ((timeinfo.tm_year + 1900)%10000),
-        (timeinfo.tm_mon%100)
+        ((timeinfo.tm_mon%100)+1)
         );
+        // printf("%s \n",file_log);
     if (mkdir(file_log, 0777) == -1 && errno != EEXIST) {
         ESP_LOGE("SD_APP", "Error creating directory: %s", file_log);
     }
@@ -141,9 +143,9 @@ void initfile(void){
     // Create day directory if it doesn't exist
     snprintf(file_log, sizeof(file_log), "/sd/%04d/%02d/%02d", 
         ((timeinfo.tm_year + 1900)%10000),
-        (timeinfo.tm_mon%100),
-        (timeinfo.tm_mday%100)
-        );
+        ((timeinfo.tm_mon%100)+1),
+        (timeinfo.tm_mday%100));
+    //    printf("%s \n",file_log);
     if (mkdir(file_log, 0777) == -1 && errno != EEXIST) {
         ESP_LOGE("SD_APP", "Error creating directory: %s", file_log);
     }
@@ -151,12 +153,13 @@ void initfile(void){
     // Create file name with timestamp
     snprintf(file_log, sizeof(file_log), "/sd/%04d/%02d/%02d/%02d%02d.csv", 
         ((timeinfo.tm_year + 1900)%10000),
-        (timeinfo.tm_mon%100), 
+        ((timeinfo.tm_mon%100)+1),
         (timeinfo.tm_mday%100), 
         (timeinfo.tm_hour%100), 
         (timeinfo.tm_min%100));  
+    //printf("%s \n",file_log);
     
-    // open file for writing, mode append
+        // open file for writing, mode append
     FILE* f = fopen(file_log, "a");
 
     if (f == NULL) {

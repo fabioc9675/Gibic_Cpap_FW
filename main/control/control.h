@@ -12,9 +12,12 @@
 #include "esp_log.h"
 #include "esp_err.h"
 #include "filter.h"
+#include "lut.h"
 
 //#define control1 control2
 #define control2
+
+
 
  /**
  * brief: Funcion para calcular el control PID
