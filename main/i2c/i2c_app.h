@@ -2,6 +2,8 @@
 #define I2C_APP_H
 
 #include "i2c/i2c_drv/i2c_common.h"
+#include "driver/gpio.h"
+#include "freertos/semphr.h"
 #include <math.h>
 #include <time.h>
 
@@ -20,6 +22,7 @@ struct Datos_I2c{
     float flujo;
     int16_t praw;
     float tempFlujo;
+    float temphumV;
 };
 
 void i2c_app(void *pvParameters);
@@ -28,8 +31,10 @@ void i2c_app_read(void);
 typedef enum {
     st_init,
     st_reqAdc0,
-    st_rsdp810,
     st_rAdc0,
+    st_reqAdc2,
+    st_rAdc2,
+    st_rsdp810,
     st_iddle
 } i2c_stetes_t;
 

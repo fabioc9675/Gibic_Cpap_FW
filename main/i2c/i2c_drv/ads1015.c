@@ -16,52 +16,71 @@ i2c_adc1015_config_t adc1015_conf = {
     .wt_ms = 1,
 };
 
-
 esp_err_t i2c_adc1015_init(){
-    uint8_t adctemp[3];
     esp_err_t ret;
     ret = i2c_master_bus_add_device(I2C1_bus_handle, &adc1015_conf.conf, 
                                     &adc1015_conf.handle);
+    if (ret != ESP_OK) return ret;
 
-                                    if (ret == ESP_OK){
-        
-        uint64_t timenow;
-        
-        //escritura de configuracion
-        adctemp[0] = 0x01; //puntero a configuracion
-        adctemp[1] = 0x03;
-        adctemp[2] = 0xE0;
-     
-        ret = i2c_master_transmit( adc1015_conf.handle, adctemp,3, -1);
+    // Configurar High Threshold MSB = 1 (Registro 0x03)
+    uint8_t hi_thresh[] = {0x03, 0x80, 0x00};
+    i2c_master_transmit( adc1015_conf.handle, hi_thresh,3, -1);
+    
+    // Configurar Low Threshold MSB = 0 (Registro 0x02)
+    uint8_t lo_thresh[] = {0x02, 0x00, 0x00};
+    i2c_master_transmit( adc1015_conf.handle, lo_thresh,3, -1);
 
-        //read_reg (0x01);
-
-        //escritura de Hi_thresh
-        timenow = esp_timer_get_time();
-        while (timenow + 400 > esp_timer_get_time()){
-            //espera de 0.4ms para la primera conversion
-        }
-        adctemp[0] = 0x03; //puntero a configuracion
-        adctemp[1] = 0x80;
-        adctemp[2] = 0x00;
-        ret = i2c_master_transmit( adc1015_conf.handle, adctemp,3, -1);
-        //read_reg (0x03);            
-
-        //escritura de Lo_thresh
-        timenow = esp_timer_get_time();
-        while (timenow + 400 > esp_timer_get_time()){
-            //espera de 0.4ms para la primera conversion
-        }
-        adctemp[0] = 0x02; //puntero a configuracion
-        adctemp[1] = 0x00;
-        adctemp[2] = 0x00;
-        ret = i2c_master_transmit( adc1015_conf.handle, adctemp,3, -1);
-        //read_reg (0x02);            
-
-    }
-
+    // Configurar Configuración MSB = 0x03, LSB = 0xE0 (Registro 0x01)
+    uint8_t config[] = {0x01, 0x03, 0xC0};
+    i2c_master_transmit( adc1015_conf.handle, config,3, -1);
+ 
     return ret;
 }
+
+// esp_err_t i2c_adc1015_init(){
+//     uint8_t adctemp[3];
+//     esp_err_t ret;
+//     ret = i2c_master_bus_add_device(I2C1_bus_handle, &adc1015_conf.conf, 
+//                                     &adc1015_conf.handle);
+//     if (ret == ESP_OK){
+        
+//         uint64_t timenow;
+        
+//         //escritura de configuracion
+//         adctemp[0] = 0x01; //puntero a configuracion
+//         adctemp[1] = 0x03;
+//         adctemp[2] = 0xE0;
+     
+//         ret = i2c_master_transmit( adc1015_conf.handle, adctemp,3, -1);
+
+//         //read_reg (0x01);
+
+//         //escritura de Hi_thresh
+//         timenow = esp_timer_get_time();
+//         while (timenow + 400 > esp_timer_get_time()){
+//             //espera de 0.4ms para la primera conversion
+//         }
+//         adctemp[0] = 0x03; //puntero a configuracion
+//         adctemp[1] = 0x80;
+//         adctemp[2] = 0x00;
+//         ret = i2c_master_transmit( adc1015_conf.handle, adctemp,3, -1);
+//         //read_reg (0x03);            
+
+//         //escritura de Lo_thresh
+//         timenow = esp_timer_get_time();
+//         while (timenow + 400 > esp_timer_get_time()){
+//             //espera de 0.4ms para la primera conversion
+//         }
+//         adctemp[0] = 0x02; //puntero a configuracion
+//         adctemp[1] = 0x00;
+//         adctemp[2] = 0x00;
+//         ret = i2c_master_transmit( adc1015_conf.handle, adctemp,3, -1);
+//         //read_reg (0x02);            
+
+//     }
+
+//     return ret;
+// }
 
 esp_err_t i2c_adc1015_get_ch(uint8_t ch, int16_t *data){
     uint8_t adctemp[3];
@@ -119,7 +138,7 @@ esp_err_t i2c_adc1015_read_ch(int16_t *data){
                                        adc1015_conf.buff, adc1015_conf.dl_r, -1);
         //ESP_LOGI(TAG, "ADC1015 read data: %02x,%02X", adc1015Buf[0],adc1015Buf[1]);                               
         *data = ((adc1015Buf[0] << 8) | adc1015Buf[1]) >> 4;
-        *data *= 2; //mv;
+        *data *= 2; // return mv;
         
 
     }else{

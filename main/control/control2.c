@@ -136,7 +136,6 @@ int16_t controller(uint8_t setpointPresion, float presion, float flow)
         upi =upi_calc;
     }
 
-
     // 7. SALIDA TOTAL
     u = uff + ufd + upp + upi + upd;
     u = clamp(u, U_MIN, U_MAX);
@@ -148,8 +147,8 @@ int16_t controller(uint8_t setpointPresion, float presion, float flow)
         //   presion,flow/10.0f,   u  ); 
         // printf("> P:%.2f, Q:%.2f, U:%.2f, Kp:%.1f, uff:%.2f, upp:%.2f, upi_calc:%.2f, upi:%.2f, upd:%.2f, ufd:%.2f\n",
         //          (presion-tmp),flow/10.0f,u/10.0f,current_Kpp,uff,upp,      upi_calc,      upi,      upd,      ufd); 
-        printf("> P:%.2f, Q:%.2f, U:%.2f, uff:%.2f, upp:%.2f, upi:%.2f, upd:%.2f, ufd:%.2f\n",
-                (presion-tmp),flow/10.0f,u/10.0f,uff,upp,     upi,      upd,      ufd); 
+        // printf("> P:%.2f, Q:%.2f, U:%.2f, uff:%.2f, upp:%.2f, upi:%.2f, upd:%.2f, ufd:%.2f\n",
+        //         (presion-tmp),flow/10.0f,u/10.0f,uff,upp,     upi,      upd,      ufd); 
     }        
     return (uint16_t)lrintf(u * 10.0f); 
 }

@@ -15,6 +15,7 @@
 #include "control/control.h"
 #include "control/filter.h"
 #include "control/lut.h"
+#include "control/humidificador.h"
 #include "proc/fResp.h"
 
 #include "wifi/wifiserver.h"
@@ -33,6 +34,9 @@ void print_task_stats(void) {
 
     printf("Task Stats:\nTask\t\tTicksE\t\t%%\n%s\n", buffer);
 }
+
+//temp
+uint64_t t_start, t_end;
 
 /**
  * Task List:  
@@ -69,19 +73,9 @@ TaskHandle_t thBldcApp = NULL;
 /**
  * flags and variables for the system
  */
-uint8_t flProcSen = 0; //flag para procesar sensores se stea en 1 cuando hay datos nuevos
 uint8_t setPointPresion = 4;
-
 int16_t bldc_sp = 1;
-uint8_t flag_bldc = 0;
 uint8_t spbldctemp = 0;
-
-
-/**
- * temporal para enviar a la pantalla
- */
-uint8_t cnt=10;
-
 
 /*
  *Variable para manejar los estados del sistema
@@ -98,8 +92,8 @@ typedef enum
     wifiserver,
     wifiend
 } MS_STATES;
-
 MS_STATES msEstados = idle;
+
 portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()
 // function to kill a task
 void killTask(TaskHandle_t *pxTaskHandle)
@@ -204,6 +198,9 @@ void app_main(void)
                 // xTaskCreate(i2c_app, "i2c_app", 4096, NULL, 10, &thI2CApp);
                 xTaskCreatePinnedToCore(i2c_app, "i2c_app", 4096, NULL, 2, &thI2CApp, PRO_CPU_NUM);
                 msEstados = initbldc;
+                // init humidificador
+                inicializarHumidificador();
+
                 break; 
                 
             case initbldc:
@@ -220,25 +217,24 @@ void app_main(void)
                 touartdata.command = UPresion;
                 touartdata.value = (int8_t)setPointPresion;
                 xQueueSend(uart_app_queue_rx, &touartdata,0);
+                inicializarHumidificador();
 
                 break;
 
             case initCpap:
+                
                 struct Datos_usd datos_usd;
                 struct Datos_I2c datos_i2c;
-                //while(uxQueueMessagesWaiting(i2c_App_queue) > 0)
+                
                 if (xQueueReceive(i2c_App_queue, &datos_i2c, portMAX_DELAY) == pdPASS)
                 { 
+                    // t_start = esp_timer_get_time();
                     /**
                      * @todo: la cola de la sd debe complementarse con datos de los 
                      * algoritmos de deteccion de apnea. esta parte es temporal
                      * aunque podria reutilizarse solo para encapsular los datos
                      * para el algoritmo de control
                      */
-                    
-                    // get data from i2c
-                    //xQueueReceive(i2c_App_queue, &datos_i2c, 0);
-
                     // process low pass filter
                     lp_filter(fl_press, datos_i2c.presion, &datos_usd.presionfl);
                     lp_filter(fl_flow, datos_i2c.flujo, &datos_usd.flujofl);
@@ -248,20 +244,15 @@ void app_main(void)
                     bldc_sp = controller(setPointPresion, datos_usd.presionfl, datos_usd.flujofl);
                     
                     //xQueueSend(bldc_App_queue, &bldc_sp, 5 / portTICK_PERIOD_MS);
-                    if (xQueueSend(bldc_App_queue, &bldc_sp, pdMS_TO_TICKS(5)) != pdPASS) {
+                    if (xQueueSend(bldc_App_queue, &bldc_sp, pdMS_TO_TICKS(20)) != pdPASS) {
                         // Error: La tarea del motor está saturada
+                        ESP_LOGE("BLDC", "Error: BLDc queue full");
                     }
                     
                     // data to sd
                     datos_usd.bldc = bldc_sp;
                     datos_usd.presionfl -= lookup_table_get(&lut_p,setPointPresion);
-                    //datos_usd.praw = datos_i2c.praw;
-                    //datos_usd.presion = datos_i2c.presion;
-                    //datos_usd.fraw = datos_i2c.fraw;
-                    //datos_usd.flujo = datos_i2c.flujo;
-                    //datos_usd.pdata = 0;
-                    //datos_usd.fl1 = 0;
-                    //datos_usd.fl2 = 0;  
+
                     // printf(">BLDC:%0.2f,Flujofl:%.4f,Presfl:%.4f\r\n", 
                     //        (datos_usd.bldc/100.0f),
                     //        //setPointPresion, 
@@ -274,8 +265,8 @@ void app_main(void)
 
                     datos_usd.presionfl -= lookup_table_get(&lut_p,setPointPresion);
                     processed_signal(datos_usd.flujofl, &datos_usd.t_smp, &datos_usd.t_cp);
-
-                    xQueueSend(sd_App_queue, &datos_usd, pdMS_TO_TICKS(5));
+                    controlarHumidificador(55.0, datos_i2c.temphumV);
+                    xQueueSend(sd_App_queue, &datos_usd, pdMS_TO_TICKS(20));
                 
                 }
                 break;
@@ -284,6 +275,7 @@ void app_main(void)
                 //turn off bldc
                 bldc_sp = -1; //inidcamos apagar
                 xQueueSend(bldc_App_queue, &bldc_sp, 0);
+                desactivarHumidificadorControl();
                 vTaskDelay(15);
                 // wait until queue empty
                 while(uxQueueMessagesWaiting(sd_App_queue)>0); // Corrected the comment typo
@@ -311,9 +303,10 @@ void app_main(void)
             default:
                 break;
         }
-
-         vTaskDelay(3);
-         // vTaskDelay(1000 / portTICK_PERIOD_MS);
+         
+        // t_end = esp_timer_get_time();
+        // printf("Tiempo de procesamiento: %llu us\n", (t_end - t_start));
+        vTaskDelay(3);
     }
 }
 
@@ -344,13 +337,7 @@ for(;;)
 
 /** 
  * @todo
- * - ok. bug de inicio. la pantalla no responde
- * - ok. carpeta por dia
- * - ok. ajustar estructura queue de datos sd
- * - ok. sacar flujo raw a la sd
- * - caracterizacion de flujo
- * - nuevo modelo del sistema y controlador
- * - anexar set pont de presion
+ * 
  * - algoritmo de nataly
  * - boton de volver al directori anterior. en web
  * - borrado de archivos masivos
