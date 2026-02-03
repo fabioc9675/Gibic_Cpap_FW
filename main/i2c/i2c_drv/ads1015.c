@@ -16,6 +16,10 @@ i2c_adc1015_config_t adc1015_conf = {
     .wt_ms = 1,
 };
 
+/**
+ * @brief Init ADC1015
+ * @return esp_err_t ESP_OK if success, otherwise error code
+ */
 esp_err_t i2c_adc1015_init(){
     esp_err_t ret;
     ret = i2c_master_bus_add_device(I2C1_bus_handle, &adc1015_conf.conf, 
@@ -31,127 +35,70 @@ esp_err_t i2c_adc1015_init(){
     i2c_master_transmit( adc1015_conf.handle, lo_thresh,3, -1);
 
     // Configurar Configuración MSB = 0x03, LSB = 0xE0 (Registro 0x01)
-    uint8_t config[] = {0x01, 0x03, 0xC0};
+    uint8_t config[] = {0x01, 0x03, 0xE0};
     i2c_master_transmit( adc1015_conf.handle, config,3, -1);
  
     return ret;
 }
 
-// esp_err_t i2c_adc1015_init(){
-//     uint8_t adctemp[3];
-//     esp_err_t ret;
-//     ret = i2c_master_bus_add_device(I2C1_bus_handle, &adc1015_conf.conf, 
-//                                     &adc1015_conf.handle);
-//     if (ret == ESP_OK){
-        
-//         uint64_t timenow;
-        
-//         //escritura de configuracion
-//         adctemp[0] = 0x01; //puntero a configuracion
-//         adctemp[1] = 0x03;
-//         adctemp[2] = 0xE0;
-     
-//         ret = i2c_master_transmit( adc1015_conf.handle, adctemp,3, -1);
-
-//         //read_reg (0x01);
-
-//         //escritura de Hi_thresh
-//         timenow = esp_timer_get_time();
-//         while (timenow + 400 > esp_timer_get_time()){
-//             //espera de 0.4ms para la primera conversion
-//         }
-//         adctemp[0] = 0x03; //puntero a configuracion
-//         adctemp[1] = 0x80;
-//         adctemp[2] = 0x00;
-//         ret = i2c_master_transmit( adc1015_conf.handle, adctemp,3, -1);
-//         //read_reg (0x03);            
-
-//         //escritura de Lo_thresh
-//         timenow = esp_timer_get_time();
-//         while (timenow + 400 > esp_timer_get_time()){
-//             //espera de 0.4ms para la primera conversion
-//         }
-//         adctemp[0] = 0x02; //puntero a configuracion
-//         adctemp[1] = 0x00;
-//         adctemp[2] = 0x00;
-//         ret = i2c_master_transmit( adc1015_conf.handle, adctemp,3, -1);
-//         //read_reg (0x02);            
-
-//     }
-
-//     return ret;
-// }
-
-esp_err_t i2c_adc1015_get_ch(uint8_t ch, int16_t *data){
+/**
+ * @brief get adc channel value in mode continuous or single shot
+ * @param[in] ch channel number 0-3
+ * @param[in] mode operation mode: continuous or single shot
+ * @return esp_err_t ESP_OK if success, otherwise error code
+ * 
+ */
+esp_err_t i2c_adc1015_get_ch(uint8_t ch, uint8_t mode)
+{
     uint8_t adctemp[3];
     esp_err_t ret;
 
-    //read config register
-    adc1015_conf.p_addr = 0x01;
-    ret = i2c_master_transmit_receive( adc1015_conf.handle, 
-                                       &adc1015_conf.p_addr,adc1015_conf.dl_p_addr,
-                                       adc1015_conf.buff, adc1015_conf.dl_r, -1);
-
-    //write config register
-    adc1015Buf[0] &= 0x0F;
-    adc1015Buf[0] |= ((--ch+4) << 4);
-    adc1015Buf[0] |= 0x80;
-
-    //revisar para reutilizar el vector del arregolo,
-    // se debe jugar con el tamaño, ampliarlo a 3 
+    //set pointer to config register
     adctemp[0] = 0x01;
-    adctemp[1] = adc1015Buf[0];
-    adctemp[2] = adc1015Buf[1];
+    // set chanel and rate
+    adctemp[1] =(uint8_t)((--ch+4) << 4)|0x03;
+    // set sample rate 3300SPS 
+    adctemp[2] = 0xE0;
+
+    if (mode == ADS1015_MODE_SINGLE_SHOT) {
+        //start single conversion
+        adctemp[1] |= 0x80;  
+    } else { 
+        // continuous mode
+        adctemp[1] &= 0xFE; 
+        // adctemp[2] |= 0xE0;
+    }
 
     ret = i2c_master_transmit( adc1015_conf.handle, 
                                    adctemp,3, -1);
-    
-    adc1015Buf[0] = 0;
-    adc1015Buf[1] = 0;
-    ret = i2c_master_transmit_receive( adc1015_conf.handle, 
-                                    &adc1015_conf.p_addr,adc1015_conf.dl_p_addr,
-                                    adc1015_conf.buff, adc1015_conf.dl_r, -1);
-    //ESP_LOGI(TAG, "ADC1015 status data: %02x,%02X", adc1015Buf[0],adc1015Buf[1]);
-    *data = (adc1015Buf[0] << 8) | adc1015Buf[1];
     return ret;
-
 }
 
+/**
+ * @brief read adc channel value. Not check if conversion is ready
+ * @param[out] data pointer to store the adc value in mV
+ * @return esp_err_t ESP_OK if success, otherwise error code
+ */
 esp_err_t i2c_adc1015_read_ch(int16_t *data){
     esp_err_t ret;
-
-    //read config register
-    adc1015_conf.p_addr = 0x01;
-    ret = i2c_master_transmit_receive( adc1015_conf.handle, 
-                                       &adc1015_conf.p_addr,adc1015_conf.dl_p_addr,
-                                       adc1015_conf.buff, adc1015_conf.dl_r, -1);
-
-    //ESP_LOGI(TAG, "ADC1015 read data: %02x,%02X", adc1015Buf[0],adc1015Buf[1]);
-    if(adc1015Buf[0] & 0x80){
-        //lectura completa
-        //se procede a la lectura
         adc1015_conf.p_addr = 0x00;
         adc1015Buf[0] = 0;
         adc1015Buf[1] = 0;
         ret = i2c_master_transmit_receive( adc1015_conf.handle, 
                                        &adc1015_conf.p_addr,adc1015_conf.dl_p_addr,
                                        adc1015_conf.buff, adc1015_conf.dl_r, -1);
-        //ESP_LOGI(TAG, "ADC1015 read data: %02x,%02X", adc1015Buf[0],adc1015Buf[1]);                               
         *data = ((adc1015Buf[0] << 8) | adc1015Buf[1]) >> 4;
         *data *= 2; // return mv;
-        
-
-    }else{
-        *data = 0;
-        ret = ESP_ERR_NOT_FINISHED;
-    }
     return ret;
 }
 
+/**
+ * @brief Convert ADC value to pressure in cmH2O
+ * @param[in] adc_value ADC value from ADS1015
+ * @param[in] offset Offset to be subtracted from the pressure
+ * @return float Pressure in cmH2O
+ */
 float get_pressure(uint16_t adc_value, float offset) {
-    // Convert ADC value to pressure in cmH2O
-    // Assuming a linear conversion for demonstration purposes
-    // Adjust the conversion factor as per your calibration
     float pressure = (((adc_value / 600.0)-1)*10); 
     return pressure - offset;
 }

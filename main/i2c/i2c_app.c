@@ -100,12 +100,12 @@ void i2c_app(void *pvParameters)
     //start sdp810 continous measurement
     ret = ESP_FAIL;
     while(ESP_OK != ret){
-        ret = xSdp810_StartContinousMeasurement(SDP800_TEMPCOMP_MASS_FLOW, SDP800_AVERAGING_TILL_READ);
+        ret = xSdp810_StartContinousMeasurement(SDP800_TEMPCOMP_MASS_FLOW, SDP800_AVERAGING_NONE);
     }
 
     // get offset presion
     // ESP_LOGI("ADC", "request offset presion adc:");
-    (void)i2c_adc1015_get_ch(3, &adc);
+    (void)i2c_adc1015_get_ch(3, ADS1015_MODE_SINGLE_SHOT);
     if (xSemaphoreTake(adc_ready_sem, pdMS_TO_TICKS(10)) == pdTRUE) {
        ret = i2c_adc1015_read_ch(&adc);
     //    ESP_LOGI("ADC", "offset presion adc: %d", adc);
@@ -132,15 +132,15 @@ void i2c_app(void *pvParameters)
         switch (i2c_state)
         {
             case st_init:
-            // ESP_LOGI("I2C_APP", "I2C cycle start");
-            //     t_inicio = esp_timer_get_time();
-                xLastWakeTime = xTaskGetTickCount();
+                // ESP_LOGW("I2C_APP", "I2C cycle start");
                 datos.timestamp = esp_timer_get_time();
-                i2c_state = st_reqAdc2;
+                xLastWakeTime = xTaskGetTickCount();
+                // i2c_state = st_reqAdc2;
+                i2c_state = st_rAdc2;
                 break;
 
             case st_reqAdc2: //request presion
-                (void)i2c_adc1015_get_ch(3, &adc); 
+                (void)i2c_adc1015_get_ch(3, ADS1015_MODE_SINGLE_SHOT); 
                 if (xSemaphoreTake(adc_ready_sem, pdMS_TO_TICKS(20)) == pdTRUE) {
                     i2c_state = st_rAdc2; 
                 } else {
@@ -157,7 +157,7 @@ void i2c_app(void *pvParameters)
                 break;
                 
             case st_reqAdc0: //request temp
-                (void)i2c_adc1015_get_ch(1, &adc);
+                (void)i2c_adc1015_get_ch(1, ADS1015_MODE_SINGLE_SHOT);
                 i2c_state = st_rsdp810; 
                 break;
                 
@@ -179,13 +179,16 @@ void i2c_app(void *pvParameters)
                     ESP_LOGE("ADC", "Error: Not received interrupt");
                     i2c_state = st_init; 
                 }
+                // enable continous read for next cycle
+                (void)i2c_adc1015_get_ch(3, ADS1015_MODE_CONTINUOUS);
+                // i2c_state = st_iddle;
                 break;
                  
             case st_iddle:
                 xQueueSend(i2c_App_queue, &datos, pdMS_TO_TICKS(10));
                 i2c_state = st_init;
-                // t_fin = esp_timer_get_time();
-                // ESP_LOGI("I2C_APP", "I2C cycle time: %lld us", (t_fin - t_inicio));
+                t_fin = esp_timer_get_time();
+                ESP_LOGI("I2C_APP", "I2C cycle time: %lld us", (t_fin - datos.timestamp));
                 xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(DT*1000));
                 break;
 

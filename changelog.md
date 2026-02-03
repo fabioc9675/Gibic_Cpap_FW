@@ -12,6 +12,3 @@
 
 ### Removed
 
-### TODO
-    - Sync RTC 
-    - Config WIFI

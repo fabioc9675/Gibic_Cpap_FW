@@ -36,6 +36,7 @@ i2c_sdp810_config_t sdp810_conf ={
     .conf.scl_speed_hz = I2C_FREQ_HZ,
     .conf.device_address = SDP810_ADDR,
     .conf.dev_addr_length = I2C_ADDR_BIT_LEN_7,
+    // @todo revisar error en la comunicacion 
     //.conf.flags.disable_ack_check = 1,
     .buff=sdp810Buf,
     .wt_ms = -1,
@@ -51,6 +52,7 @@ esp_err_t xCheckCrc(uint8_t *data, uint8_t size, uint8_t checksum);
 
 /**
  * @brief Init Sdp810
+ * @return esp_err_t ESP_OK if success, otherwise error code
  */
 esp_err_t xSdp810Init(void){
     esp_err_t ret = ESP_OK;
@@ -71,11 +73,9 @@ esp_err_t xSdp810Init(void){
  * @brief Starts the continous mesurement with the specified settings.
  */
 
- // @todo revisar error en la comunicacion 
 esp_err_t xSdp810_StartContinousMeasurement(Sdp800TempComp tempComp,
                                             Sdp800Averaging averaging){
     esp_err_t ret = ESP_FAIL;
-    //static uint8_t count = 0;
     Command command = COMMAND_UNDEFINED;
 
     // determine command code
@@ -111,19 +111,20 @@ esp_err_t xSdp810_StartContinousMeasurement(Sdp800TempComp tempComp,
         ret = i2c_master_bus_reset(I2C1_bus_handle);
         ret = i2c_master_transmit(sdp810_conf.handle, 
                               sdp810_conf.buff,2, -1);
-        //ret = xExecuteCommand(command);
     } else {
         ret = ESP_ERR_INVALID_ARG;
-   }
-    //printf("execute command: %04X, count: %d\n",ret, count++);
+    }
     return ret;
 }
 
 /**
  * @brief Reads the measurment result from the continous measurment.
+ * @param[out] diffPressure Pointer to return the measured diverential pressur.
+ * @param[out] temperature  Pointer to return the measured temperature.
+ * @return ESP_OK: Read success.
+ *         ESP_FAIL: Not success.
  */
 esp_err_t xSdp810_ReadMeasurementResults(float *diffPressure, float *temperature){
-
     esp_err_t ret;
     int16_t  diffPressureTicks;
     int16_t  temperatureTicks;
@@ -131,13 +132,6 @@ esp_err_t xSdp810_ReadMeasurementResults(float *diffPressure, float *temperature
     
     ret = xReadMeasurementRawResults(&diffPressureTicks, &temperatureTicks,
                                     &scaleFactorDiffPressure);
-    
-    #ifdef DEBUG
-        printf("error %04x \n", ret);                                        
-        printf("diffPressureTicks: %d\n",diffPressureTicks);
-        printf("temperatureTicks: %d\n",temperatureTicks);
-        printf("scaleFactorDiffPressure: %d\n",scaleFactorDiffPressure);
-    #endif
     
     if (ret == ESP_OK){
         *diffPressure = (float)diffPressureTicks / (float)scaleFactorDiffPressure;
@@ -152,12 +146,10 @@ esp_err_t xSdp810_ReadMeasurementResults(float *diffPressure, float *temperature
 esp_err_t xReadMeasurementRawResults(int16_t *diffPressureTicks,
                                      int16_t *temperatureTicks,
                                      uint16_t *scaleFactor){
-
     esp_err_t ret;
     ret = i2c_master_receive(sdp810_conf.handle, sdp810_conf.buff, 9, sdp810_conf.wt_ms);
   
     if (ret == ESP_OK){
-        //transaction success
         //let check the crc
         for (int i = 0; i < 3; i++){
             if (ret != ESP_OK){
@@ -183,6 +175,10 @@ esp_err_t xReadMeasurementRawResults(int16_t *diffPressureTicks,
 
 /**
  * @brief Read a word from the sensor and check the CRC.
+ * @param data Pointer to data bytes.
+ * @param size Number of data bytes.
+ * @param checksum Checksum byte.
+ * @return ESP_OK if checksum matches, otherwise ESP_FAIL.
  */
 esp_err_t xCheckCrc(uint8_t *data, uint8_t size, uint8_t checksum){
     uint8_t crc = 0xFF;
@@ -197,7 +193,6 @@ esp_err_t xCheckCrc(uint8_t *data, uint8_t size, uint8_t checksum){
     // verify checksum
   return (crc == checksum) ? ESP_OK : ESP_FAIL;
 }
-
 
 /**
  * @brief get flow measurement from SDP810
@@ -222,6 +217,5 @@ float get_flow(float fraw, float offset) {
     }else {
         flow = 0.0;
     }
-
     return flow - offset;
 }

@@ -33,6 +33,12 @@
 #define ADC_ADDR      0x48   // ADC1015_ADD ADC 400Khz
 #define SDP810_ADDR   0x25   // SDP810_ADD SDP810 400Khz
 
+/**
+ * Modes for ADS1015 operation
+ */
+#define ADS1015_MODE_CONTINUOUS    0
+#define ADS1015_MODE_SINGLE_SHOT   1
+
 /*
  *externals variables for I2C1
  */
@@ -113,10 +119,9 @@ esp_err_t i2c_adc1015_init(void);
 /**
  * @brief Get data from ADS1015
  * @param[in] ch Channel of ADS1015
- * @param[out] data Data read from ADS1015 register 1
  * @return ESP_OK: Read success. Otherwise failed, please check I2C function fail reason.
  */
-esp_err_t i2c_adc1015_get_ch(uint8_t ch, int16_t *data);
+esp_err_t i2c_adc1015_get_ch(uint8_t ch, uint8_t mode);
 
 /**
  * @brief Read data from ADS1015
