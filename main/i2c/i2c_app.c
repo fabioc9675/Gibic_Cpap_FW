@@ -135,6 +135,7 @@ void i2c_app(void *pvParameters)
             // ESP_LOGI("I2C_APP", "I2C cycle start");
             //     t_inicio = esp_timer_get_time();
                 xLastWakeTime = xTaskGetTickCount();
+                datos.timestamp = esp_timer_get_time();
                 i2c_state = st_reqAdc2;
                 break;
 
@@ -181,11 +182,11 @@ void i2c_app(void *pvParameters)
                 break;
                  
             case st_iddle:
-                xQueueSend(i2c_App_queue, &datos, pdMS_TO_TICKS(5));
+                xQueueSend(i2c_App_queue, &datos, pdMS_TO_TICKS(10));
                 i2c_state = st_init;
                 // t_fin = esp_timer_get_time();
                 // ESP_LOGI("I2C_APP", "I2C cycle time: %lld us", (t_fin - t_inicio));
-                xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(10));
+                xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(DT*1000));
                 break;
 
             default:

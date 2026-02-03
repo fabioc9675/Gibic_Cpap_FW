@@ -92,7 +92,7 @@ void desactivarHumidificadorControl(void) {
 }
 
 void actualizarControl(float T, float Tset) {
-    printf("Setpoint humidificador: %.2f C \t temperatura actual: %.2f C\n", Tset, T);
+    // printf("Setpoint humidificador: %.2f C \t temperatura actual: %.2f C\n", Tset, T);
     if (!controlActivo) {
         desactivar_pin();
     } else {

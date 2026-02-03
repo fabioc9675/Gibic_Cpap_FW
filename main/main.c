@@ -259,12 +259,13 @@ void app_main(void)
                     //        datos_usd.flujofl, 
                     //        datos_usd.presionfl);   
                     // ESP_LOGI("DATA CPAP","BLDC:%0.2f,Flujofl:%.4f,Presfl:%.4f", 
-                    //     (datos_usd.bldc/100.0f),
-                    //     datos_usd.flujofl,
-                    //     datos_usd.presionfl);
+                    //      (datos_usd.bldc/100.0f),
+                    //      datos_usd.flujofl,
+                    //      datos_usd.presionfl);
 
                     datos_usd.presionfl -= lookup_table_get(&lut_p,setPointPresion);
-                    processed_signal(datos_usd.flujofl, &datos_usd.t_smp, &datos_usd.t_cp);
+                    datos_usd.timestamp = datos_i2c.timestamp;
+                    //processed_signal(datos_usd.flujofl, &datos_usd.t_smp, &datos_usd.t_cp);
                     controlarHumidificador(55.0, datos_i2c.temphumV);
                     xQueueSend(sd_App_queue, &datos_usd, pdMS_TO_TICKS(20));
                 

@@ -3,7 +3,7 @@
 /**
  * Each file record will contain 20 miniutes of data
  */
-#define RECORD_SIZE (FS * 60 * 20) // 20 minutes of data
+#define RECORD_SIZE (FS * 60 * 60) // 60 minutes of data
 
 //handler de la cola de envio a la sd
 QueueHandle_t sd_App_queue = NULL;
@@ -53,12 +53,20 @@ void sd_App(void *pvParameters){
                 //         datos.fl1,
                 //         datos.fl2);
                 //"              BLDC, Presion, Flujo, smp  , cp\n"   
-                sprintf(bufferSd, "%d, %0.6f,   %0.6f, %0.6f, %0.6f\n", 
+                // sprintf(bufferSd, "%d, %0.6f,   %0.6f, %0.6f, %0.6f\n", 
+                //         datos.bldc,
+                //         datos.presionfl,
+                //         datos.flujofl,
+                //         datos.t_smp,
+                //         datos.t_cp);
+                
+                // sprintf(bufferSd, "Time,BLDC,Presion,Flujo\n");
+                sprintf(bufferSd, "%lld, %d, %0.6f,   %0.6f\n", 
+                        datos.timestamp/1000,    
                         datos.bldc,
                         datos.presionfl,
-                        datos.flujofl,
-                        datos.t_smp,
-                        datos.t_cp);
+                        datos.flujofl
+                        );        
                 
                 /**
                  *  uint16_t bldc;
@@ -177,14 +185,15 @@ void initfile(void){
                 timeinfo.tm_min,
                 timeinfo.tm_sec);
         fprintf(f, bufferSd);
-        sprintf(bufferSd, "Tasa de muestreo: 100Hz\n");
+        sprintf(bufferSd, "Tasa de muestreo: 50Hz\n");
         fprintf(f, bufferSd);
 
         sprintf(bufferSd, "\n");
         fprintf(f, bufferSd);
 
-        //sprintf(bufferSd, "BLDC,PRAW,Presion,Presionfl,FRAW,Flujo,Flujofl,pdata,fl1,fl2\n");
-        sprintf(bufferSd, "BLDC,Presion,Flujo,smp,cp\n");
+        // sprintf(bufferSd, "BLDC,PRAW,Presion,Presionfl,FRAW,Flujo,Flujofl,pdata,fl1,fl2\n");
+        // sprintf(bufferSd, "BLDC,Presion,Flujo,smp,cp\n");
+        sprintf(bufferSd, "Time,BLDC,Presion,Flujo\n");
         fprintf(f, bufferSd);
         fclose(f);
         //ESP_LOGI("SD_APP", "File written\n");    

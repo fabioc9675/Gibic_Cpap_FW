@@ -13,8 +13,11 @@
 
 #include "usdDrv.h"
 
-
+/**
+ *  @todo depurar extructura de datos
+ */
 struct Datos_usd{
+    uint64_t timestamp;
     int16_t bldc;
     int16_t praw;  // sensor raw presion
     float presion; // sensor presion

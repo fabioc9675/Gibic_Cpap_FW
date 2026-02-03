@@ -4,10 +4,6 @@
 
 #ifdef control2
 
-/* ---------- Configuración ---------- */
-#define SAMPLE_HZ          100.0f
-#define DT                 0.01f
-
 /*------------ Ganancias PID ------------*/
 // Integral
 #define Kpi   15.0f    
@@ -143,8 +139,8 @@ int16_t controller(uint8_t setpointPresion, float presion, float flow)
     // 8. LOGGING
     flag = !flag;
     if (flag){
-        // printf("> P:%.2f, Q:%.2f, U:%.2f\n",
-        //   presion,flow/10.0f,   u  ); 
+        printf("> P:%.2f, Q:%.2f, U:%.2f\n",
+          presion,flow/10.0f,   u/10  ); 
         // printf("> P:%.2f, Q:%.2f, U:%.2f, Kp:%.1f, uff:%.2f, upp:%.2f, upi_calc:%.2f, upi:%.2f, upd:%.2f, ufd:%.2f\n",
         //          (presion-tmp),flow/10.0f,u/10.0f,current_Kpp,uff,upp,      upi_calc,      upi,      upd,      ufd); 
         // printf("> P:%.2f, Q:%.2f, U:%.2f, uff:%.2f, upp:%.2f, upi:%.2f, upd:%.2f, ufd:%.2f\n",

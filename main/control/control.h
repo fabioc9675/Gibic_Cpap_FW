@@ -13,6 +13,7 @@
 #include "esp_err.h"
 #include "filter.h"
 #include "lut.h"
+#include "common/common.h"
 
 //#define control1 control2
 #define control2

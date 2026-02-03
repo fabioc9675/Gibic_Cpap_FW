@@ -1,11 +1,12 @@
 #ifndef I2C_APP_H
 #define I2C_APP_H
 
+#include <math.h>
+#include <time.h>
 #include "i2c/i2c_drv/i2c_common.h"
 #include "driver/gpio.h"
 #include "freertos/semphr.h"
-#include <math.h>
-#include <time.h>
+#include "common/common.h"
 
 
 /**
@@ -17,6 +18,7 @@ extern QueueHandle_t i2c_App_queue;
 
 
 struct Datos_I2c{
+    uint64_t timestamp;
     float fraw;
     float presion;
     float flujo;
