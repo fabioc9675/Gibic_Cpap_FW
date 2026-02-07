@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 
 #define FS   50.0f  // Sample frequency in Hz
+#define MEAN_WINDOW_SIZE 5 // Number of samples for moving average
 #define DT   (1.0f/FS) // Sample period in seconds
 
 typedef struct {
@@ -15,7 +16,6 @@ typedef struct {
     uint16_t tail;      // index of the tail element
     uint16_t count;     // current number of elements in the buffer
 } circbuf_t;
-
 
 /**
  * @brief Creates a circular buffer.

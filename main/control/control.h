@@ -15,7 +15,7 @@
 #include "lut.h"
 #include "common/common.h"
 
-//#define control1 control2
+//#define control1 control2 control3
 #define control2
 
 

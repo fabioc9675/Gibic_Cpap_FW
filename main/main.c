@@ -129,10 +129,14 @@ void app_main(void)
     uart_app_queue_rx = xQueueCreate(10, sizeof(struct ToUartData ));
     //          xTaskCreate(uart_app, "uart_app", 4096, NULL, 10, &thUartApp);
     xTaskCreatePinnedToCore(uart_app, "uart_app", 4096, NULL, 1, &thUartApp, APP_CPU_NUM);
-    filter_t *fl_press = filter_create(3);
-    filter_t *fl_flow = filter_create(3);
-    fResp_init();
-    //zeros_crossings();
+
+    // * Algorithm variables and buffers initialization */
+    //filter_t *fl_press = filter_create(3);
+    //filter_t *fl_flow = filter_create(3);
+    circbuf_t *fpmean = create_buffer(MEAN_WINDOW_SIZE);
+    circbuf_t *fqmean = create_buffer(MEAN_WINDOW_SIZE);
+    // fResp_init();
+    // zeros_crossings();
 
     
     for(;;)
@@ -185,22 +189,19 @@ void app_main(void)
             case initfilesd:
                 //init queue and task sdcard
                 sd_App_queue = xQueueCreate(10, sizeof(struct Datos_usd));
-                // xTaskCreate(sd_App, "sd_App", 4096, NULL, 10, &thSdApp);
                 xTaskCreatePinnedToCore(sd_App, "sd_App", 4096, NULL, 1, &thSdApp, APP_CPU_NUM);
-                filter_init(fl_press, butn3, butd3);
-                filter_init(fl_flow, butn3, butd3);
+                // filter_init(fl_press, butn3, butd3);
+                // filter_init(fl_flow, butn3, butd3);
                 msEstados = initSensors;//iniciar proceso
                 break;
             
             case initSensors:
                 //init queue and task i2c
                 i2c_App_queue = xQueueCreate(10, sizeof(struct Datos_I2c));
-                // xTaskCreate(i2c_app, "i2c_app", 4096, NULL, 10, &thI2CApp);
                 xTaskCreatePinnedToCore(i2c_app, "i2c_app", 4096, NULL, 2, &thI2CApp, PRO_CPU_NUM);
                 msEstados = initbldc;
                 // init humidificador
                 inicializarHumidificador();
-
                 break; 
                 
             case initbldc:
@@ -236,16 +237,19 @@ void app_main(void)
                      * para el algoritmo de control
                      */
                     // process low pass filter
-                    lp_filter(fl_press, datos_i2c.presion, &datos_usd.presionfl);
-                    lp_filter(fl_flow, datos_i2c.flujo, &datos_usd.flujofl);
+                    //lp_filter(fl_press, datos_i2c.presion, &datos_usd.presionfl);
+                    // lp_filter(fl_flow, datos_i2c.flujo, &datos_usd.flujofl);
                     
+                    buffer_push(fpmean, datos_i2c.presion);
+                    buffer_push(fqmean, datos_i2c.flujo);
+                    datos_usd.presionfl = mean(fpmean->buffer,MEAN_WINDOW_SIZE);
+                    datos_usd.flujofl = mean(fqmean->buffer,MEAN_WINDOW_SIZE);
+              
                     // process pid control
-                    //bldc_sp = controller(setPointPresion, datos_i2c.presion, datos_i2c.flujo);
+                    // bldc_sp = controller(setPointPresion, datos_i2c.presion, datos_i2c.flujo);
                     bldc_sp = controller(setPointPresion, datos_usd.presionfl, datos_usd.flujofl);
                     
-                    //xQueueSend(bldc_App_queue, &bldc_sp, 5 / portTICK_PERIOD_MS);
                     if (xQueueSend(bldc_App_queue, &bldc_sp, pdMS_TO_TICKS(20)) != pdPASS) {
-                        // Error: La tarea del motor está saturada
                         ESP_LOGE("BLDC", "Error: BLDc queue full");
                     }
                     
@@ -265,10 +269,9 @@ void app_main(void)
 
                     datos_usd.presionfl -= lookup_table_get(&lut_p,setPointPresion);
                     datos_usd.timestamp = datos_i2c.timestamp;
-                    //processed_signal(datos_usd.flujofl, &datos_usd.t_smp, &datos_usd.t_cp);
+                    // processed_signal(datos_usd.flujofl, &datos_usd.t_smp, &datos_usd.t_cp);
                     controlarHumidificador(55.0, datos_i2c.temphumV);
                     xQueueSend(sd_App_queue, &datos_usd, pdMS_TO_TICKS(20));
-                
                 }
                 break;
             
