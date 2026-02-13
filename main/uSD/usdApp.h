@@ -33,6 +33,7 @@ struct Datos_usd{
 };
 
 void sd_App(void *pvParameters);
+void closefile(void);   
 extern QueueHandle_t sd_App_queue;
 
 #endif // USD_APP_H

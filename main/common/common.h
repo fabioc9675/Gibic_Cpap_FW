@@ -5,8 +5,9 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#define FS   50.0f  // Sample frequency in Hz
-#define MEAN_WINDOW_SIZE 5 // Number of samples for moving average
+#define FS   200.0f  // Sample frequency in Hz
+#define FS_LOG 50.0f // Logging frequency in Hz
+#define MEAN_WINDOW_SIZE 10 // Number of samples for moving average
 #define DT   (1.0f/FS) // Sample period in seconds
 
 typedef struct {

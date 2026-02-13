@@ -76,6 +76,7 @@ TaskHandle_t thBldcApp = NULL;
 uint8_t setPointPresion = 4;
 int16_t bldc_sp = 1;
 uint8_t spbldctemp = 0;
+uint8_t t_log = 0;
 
 /*
  *Variable para manejar los estados del sistema
@@ -267,11 +268,17 @@ void app_main(void)
                     //      datos_usd.flujofl,
                     //      datos_usd.presionfl);
 
+
+                    
+
                     datos_usd.presionfl -= lookup_table_get(&lut_p,setPointPresion);
                     datos_usd.timestamp = datos_i2c.timestamp;
                     // processed_signal(datos_usd.flujofl, &datos_usd.t_smp, &datos_usd.t_cp);
-                    controlarHumidificador(55.0, datos_i2c.temphumV);
-                    xQueueSend(sd_App_queue, &datos_usd, pdMS_TO_TICKS(20));
+                    controlarHumidificador(45.0, datos_i2c.temphumV);
+                    if (t_log++ >= FS/FS_LOG){
+                        t_log = 0;
+                        xQueueSend(sd_App_queue, &datos_usd, pdMS_TO_TICKS(20));
+                    }
                 }
                 break;
             
@@ -288,6 +295,7 @@ void app_main(void)
 
             case endCpap:
                 //terminar procesos
+                closefile();
                 killTask(&thSdApp);
                 killTask(&thI2CApp);
                 killTask(&thBldcApp);
@@ -310,7 +318,7 @@ void app_main(void)
          
         // t_end = esp_timer_get_time();
         // printf("Tiempo de procesamiento: %llu us\n", (t_end - t_start));
-        vTaskDelay(3);
+        vTaskDelay(1);
     }
 }
 

@@ -69,5 +69,6 @@
       "bitset": "c",
       "stdbool.h": "c"
     },
-    "idf.pythonInstallPath": "/usr/bin/python3"
+    "idf.pythonInstallPath": "/usr/bin/python3",
+    "idf.currentSetup": "/home/darwin/Documents/esp/v5.5.1/esp-idf"
 }

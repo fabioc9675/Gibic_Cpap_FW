@@ -257,8 +257,8 @@ typedef enum {
 } CPAP_State;
 
 #define BRAKE_DURATION_TICKS 100  // 1000ms de frenado activo a 100Hz
-#define Q_DROP_PERCENTAGE 0.90f // Disparo al caer al 80% del pico
-#define SLOPE_BRAKE_THRESHOLD -15.0f // Sensibilidad de la pendiente dQ/dt
+#define Q_DROP_PERCENTAGE 0.85f // Disparo al caer al 80% del pico
+#define SLOPE_BRAKE_THRESHOLD -10.0f // Sensibilidad de la pendiente dQ/dt
 
 /*------------ Ganancias PID ------------*/
 #define Kpi   17.0f    // Integral
@@ -316,10 +316,11 @@ int16_t controller(uint8_t setpointPresion, float presion, float flow)
 
             // Condición de Predicción: ¿Caída repentina de flujo?
             if (flow < (Q_DROP_PERCENTAGE * Q_peak) && dq < SLOPE_BRAKE_THRESHOLD) {
-                currentState = STATE_BRAKE;
                 brakeCounter = 0;
+                sp_active = sp_nominal - 1.0f; 
+                currentState = STATE_BRAKE;
                 // Reset de integral para evitar "windup" durante el pico de presión exhalatoria
-                integral *= 0.2f; 
+                // integral *= 0.2f; 
             }
             break;
 
@@ -328,20 +329,20 @@ int16_t controller(uint8_t setpointPresion, float presion, float flow)
 
             // ESTRATEGIA: "Bajar el setpoint"
             // Reducimos el setpoint activo 1.0 cmH2O por debajo del nominal para forzar el frenado
-            sp_active = sp_nominal - 1.0f; 
 
             // CONDICIÓN DE SALIDA: Presión cae por debajo de (sp_nominal - 0.5)
             // Se incluye un timeout de seguridad de 200ms (20 ticks)
-            if (presion < (sp_nominal - 0.3f) || brakeCounter >= BRAKE_DURATION_TICKS) {
+            if (presion < (sp_nominal - 0.05f) )//|| brakeCounter >= BRAKE_DURATION_TICKS) 
+            {
                 integral = 0.0f; //
+                sp_active = sp_nominal; // Restauramos setpoint nominal para la espiración
                 currentState = STATE_EXP;
             }
             break;
 
         case STATE_EXP:
-            sp_active = sp_nominal; // Restauramos setpoint nominal para la espiración
             // Trigger Inspiratorio: El paciente vuelve a demandar flujo
-            if (dq > 5.0f && flow > 2.0f) { // Umbrales de ejemplo
+            if (dq > 5.0f && flow > 15.0f) { // Umbrales de ejemplo
                 Q_peak = 0.0f;
                 currentState = STATE_INSP;
             }
@@ -380,6 +381,8 @@ int16_t controller(uint8_t setpointPresion, float presion, float flow)
 
     if (currentState == STATE_BRAKE) {
         uff *= 0.3f; // Reducción adicional durante el frenado activo
+        if (upd > 0.0f) upd *= -1.0f; // Atenuación del derivativo si va en dirección de aumentar presión
+        if (uqd > 0.0f) uqd *= -1.0f; // Evitar que la integral sume durante el frenado
     }
     
     u = uff + upp + upi + upd + uqd;
@@ -387,8 +390,9 @@ int16_t controller(uint8_t setpointPresion, float presion, float flow)
     u = clamp(u, U_MIN, U_MAX);
 
     // 8. LOGGING
-    flag = !flag;
-    if (flag){
+    // flag = !flag;
+    if (flag++ >= 4){
+        flag = 0;
         // printf("> P:%.2f, Q:%.2f, U:%.2f\n",
         //   presion,flow/10.0f,   u/10  ); 
         // printf("> P:%.2f, Q:%.2f, U:%.2f, Kp:%.1f, uff:%.2f, upp:%.2f, upi_calc:%.2f, upi:%.2f, upd:%.2f, ufd:%.2f\n",

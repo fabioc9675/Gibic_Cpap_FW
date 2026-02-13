@@ -3,7 +3,7 @@
 /**
  * Each file record will contain 20 miniutes of data
  */
-#define RECORD_SIZE (FS * 60 * 60) // 60 minutes of data
+#define RECORD_SIZE (FS_LOG * 60 * 60) // 60 minutes of data
 
 //handler de la cola de envio a la sd
 QueueHandle_t sd_App_queue = NULL;
@@ -13,32 +13,37 @@ QueueHandle_t sd_App_queue = NULL;
 //char dir_month[14];
 char file_log[30];
 char bufferSd[128];
+FILE *f_log = NULL;
 
 // local functions
 void initfile(void);
 
 void sd_App(void *pvParameters){
     static uint32_t cnt = 0;
-    
+    // temp
+    int64_t t_inicio, t_fin;
+    //esp_timer_get_time();
     initfile();
     for(;;)
     {
         struct Datos_usd datos;
-        while(uxQueueMessagesWaiting(sd_App_queue) > 0){
-            xQueueReceive(sd_App_queue, &datos, portMAX_DELAY);
-            
+        if (xQueueReceive(sd_App_queue, &datos, portMAX_DELAY) == pdPASS)
+        // while(uxQueueMessagesWaiting(sd_App_queue) > 0)
+        {
+            // xQueueReceive(sd_App_queue, &datos, portMAX_DELAY);
+            //esp_timer_get_time();
+            t_inicio = esp_timer_get_time();
             // check size of regs
             if (cnt++ >= RECORD_SIZE){
                 cnt = 0;
                 initfile();
             }
             
-            FILE* f = fopen(file_log, "a");
-            if (f == NULL) {
+            if (f_log == NULL) {
                 //enviamos mensaje de error
                 ESP_LOGE("SD_APP", "Failed to open file for writing\n");
                 ESP_LOGE("SD_APP", "File: %s\n", file_log); 
-                return;
+                // No retornar, intentar en la siguiente iteración o esperar a initfile
             }else{
                 //"BLDC,PRAW,Presion,Presionfl,FRAW,Flujo,Flujofl,pdata,fl1,fl2\n"
                 // sprintf(bufferSd, "%d, %d, %0.6f, %0.6f, %0.6f, %0.6f, %0.6f, %0.6f, %d, %d\n", 
@@ -61,7 +66,8 @@ void sd_App(void *pvParameters){
                 //         datos.t_cp);
                 
                 // sprintf(bufferSd, "Time,BLDC,Presion,Flujo\n");
-                sprintf(bufferSd, "%lld, %d, %0.6f,   %0.6f\n", 
+                sprintf(bufferSd, "%ld, %lld, %d, %0.6f,   %0.6f\n", 
+                        cnt,
                         datos.timestamp/1000,    
                         datos.bldc,
                         datos.presionfl,
@@ -82,19 +88,26 @@ void sd_App(void *pvParameters){
                  */                
                 
                 // write data to file
-                fprintf(f, bufferSd);
+                fprintf(f_log, bufferSd);
                 
                 // close file
-                fclose(f);
+                // fclose(f); // Mantenemos el archivo abierto para velocidad
+                t_fin = esp_timer_get_time();
+                // ESP_LOGI("USD_APP", "I2C cycle time: %lld us", (t_fin - t_inicio));
             }
         }
-        vTaskDelay(4 / portTICK_PERIOD_MS);
     }
 }
 
 void initfile(void){
     struct tm timeinfo;
     time_t now;
+
+    // Si hay un archivo abierto, cerrarlo antes de crear uno nuevo
+    if (f_log != NULL) {
+        fclose(f_log);
+        f_log = NULL;
+    }
 
     // Get current time from system 
     time(&now);
@@ -168,15 +181,15 @@ void initfile(void){
     //printf("%s \n",file_log);
     
         // open file for writing, mode append
-    FILE* f = fopen(file_log, "a");
+    f_log = fopen(file_log, "a");
 
-    if (f == NULL) {
+    if (f_log == NULL) {
         ESP_LOGE("SD_APP", "Failed to open file for writing\n");
         ESP_LOGE("SD_APP", "File: %s\n", file_log); 
         return;
     }else{
         sprintf(bufferSd, "CPAP - GIBIC - UDEA\n");
-        fprintf(f, bufferSd);
+        fprintf(f_log, bufferSd);
         sprintf(bufferSd, "Hora de inicio: %04d-%02d-%02d %02d:%02d:%02d\n", 
                 timeinfo.tm_year + 1900, 
                 timeinfo.tm_mon, 
@@ -184,18 +197,24 @@ void initfile(void){
                 timeinfo.tm_hour, 
                 timeinfo.tm_min,
                 timeinfo.tm_sec);
-        fprintf(f, bufferSd);
+        fprintf(f_log, bufferSd);
         sprintf(bufferSd, "Tasa de muestreo: 50Hz\n");
-        fprintf(f, bufferSd);
+        fprintf(f_log, bufferSd);
 
         sprintf(bufferSd, "\n");
-        fprintf(f, bufferSd);
+        fprintf(f_log, bufferSd);
 
         // sprintf(bufferSd, "BLDC,PRAW,Presion,Presionfl,FRAW,Flujo,Flujofl,pdata,fl1,fl2\n");
         // sprintf(bufferSd, "BLDC,Presion,Flujo,smp,cp\n");
-        sprintf(bufferSd, "Time,BLDC,Presion,Flujo\n");
-        fprintf(f, bufferSd);
-        fclose(f);
+        sprintf(bufferSd, "Sequence,Time,BLDC,Presion,Flujo\n");
+        fprintf(f_log, bufferSd);
         //ESP_LOGI("SD_APP", "File written\n");    
+    }
+}
+
+void closefile(void){
+    if (f_log != NULL) {
+        fclose(f_log);
+        f_log = NULL;
     }
 }
