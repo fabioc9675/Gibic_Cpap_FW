@@ -18,7 +18,7 @@ const float T0    = 298.15;
 const float BETA  = 3576.0;
 
 // // --------- Control ----------
-#define N_MUESTRAS  50
+#define N_MUESTRAS  FS
 float acumTemp = 0.0;
 int muestraCount = 0;
 const float HISTERESIS = 2.0;
@@ -26,6 +26,7 @@ const float HISTERESIS = 2.0;
 
 // float Tset = 0.0;
 bool controlActivo = false;
+bool PinInit = false;
 // bool calefaccionON = false;
 
 // // unsigned long tiempoAnterior = 0;
@@ -98,13 +99,13 @@ void actualizarControl(float T, float Tset) {
     } else {
         if (T <= (Tset - HISTERESIS)) {
             // if (!calefaccionON) {
-                activar_pin();
+            activar_pin();
             // calefaccionON = true;
                 // printf("Humidificador ON\n");
             // }
-        } else if (T >= (Tset - 1.5f)) {
+        } else if (T >= (Tset + HISTERESIS - 1.0f)) { // Agregamos un margen adicional para evitar oscilaciones
             // if (calefaccionON) {
-                desactivar_pin();
+            desactivar_pin();
             // calefaccionON = false;
                 // printf("Humidificador OFF\n");
             // }
@@ -113,9 +114,12 @@ void actualizarControl(float T, float Tset) {
 }
 
 void inicializarHumidificador() {
+    if (!PinInit){
+        PinInit = true;
+        configurar_gpio();
+    }
     muestraCount = 0;
     acumTemp = 0.0;
-    configurar_gpio();
     desactivar_pin();
     activarHumidificadorControl();
 
@@ -130,7 +134,7 @@ void controlarHumidificador(float setpoint,float Vntc) {
         muestraCount = 0;
         float Vprom = acumTemp / N_MUESTRAS;
         float T = temperaturaDesdeVoltaje(Vprom); 
-        // printf("temperatura humidificador: %.2f C \t Voltaje: %.2f\n", T, Vprom);
+        // printf("temperatura humidificador: %.2f C \t Voltaje: %.2f \t SP:%0.2f\n", T, Vprom, setpoint);
         acumTemp = 0.0;
         actualizarControl(T, setpoint);
     }

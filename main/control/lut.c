@@ -1,17 +1,27 @@
 #include "lut.h"
 
-float x_values[] = { 4.0f,  5.0f,  6.0f,  7.0f,  8.0f,  9.0f, 10.0f, 11.0f, 12.0f,
+float x_vPression[] = { 4.0f,  5.0f,  6.0f,  7.0f,  8.0f,  9.0f, 10.0f, 11.0f, 12.0f,
                     13.0f, 14.0f, 15.0f, 16.0f, 17.0f, 18.0f, 19.0f, 20.0f}; // Entradas
-float y_values[] = {0.15f, 0.22f, 0.35f, 0.28f, 0.30f, 0.40f, 0.43f, 0.48f, 0.48f,
+float y_vPression[] = {0.15f, 0.22f, 0.35f, 0.28f, 0.30f, 0.40f, 0.43f, 0.48f, 0.48f,
                     0.52f, 0.62f, 0.70f, 0.70f, 0.80f, 0.73f, 0.85f, 0.82f}; // Salidas
 
+float x_vHum[] = { 0.0f, 1.0f,  2.0f,  3.0f,  4.0f,  5.0f,  6.0f,  7.0f,  8.0f,  9.0f}; // Entradas
+float y_vHum[] = { 0.0f, 25.0f, 30.0f, 35.0f, 40.0f, 40.0f, 40.0f, 40.0f, 40.0f, 40.0f}; // Salidas
+
 lookup_table_t lut_p;
+lookup_table_t lut_h;
 
 void init_lut_p(void){
-    lut_p.x = x_values;
-    lut_p.y = y_values;
-    lut_p.size = sizeof(x_values) / sizeof(x_values[0]);
-}                    
+    lut_p.x = x_vPression;
+    lut_p.y = y_vPression;
+    lut_p.size = sizeof(x_vPression) / sizeof(x_vPression[0]);
+}   
+
+void init_lut_h(void){
+    lut_h.x = x_vHum;
+    lut_h.y = y_vHum;
+    lut_h.size = sizeof(x_vHum) / sizeof(x_vHum[0]);
+}   
 
 float lookup_table_get(const lookup_table_t *table, float input) {
     // Manejar casos fuera de los límites

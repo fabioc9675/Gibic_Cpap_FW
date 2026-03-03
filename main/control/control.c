@@ -51,7 +51,7 @@
      * param: presion: presion actual del sistema
      * return: salida del control PID
      */
-    int16_t controller(uint8_t setpointPresion, float presion, float flow) {
+    int16_t controller(float setpointPresion, float presion, float flow) {
         int16_t pwm_output;
         #ifdef caract
             #ifdef escalon
@@ -146,12 +146,12 @@ static inline float clamp(float x, float lo, float hi) {
     return (x < lo) ? lo : (x > hi) ? hi : x;
 }
 
-int16_t controller(uint8_t setpointPresion, float presion, float flow)
+int16_t controller(float setpointPresion, float presion, float flow)
 {
     float u = 0.0f;
     static float integral = 0.0f;
     float tmp = lookup_table_get(&lut_p,setpointPresion);
-    float sp = (float)setpointPresion + tmp; // Compensación por fricción estática
+    float sp = setpointPresion + tmp; // Compensación por fricción estática
 
     // 1. FEEDFORWARD
     //uff = a0 + a1*p + a2*q + a3*p**2 + a4*q**2 + a5*p*q (lpos)
@@ -234,12 +234,12 @@ int16_t controller(uint8_t setpointPresion, float presion, float flow)
     u = clamp(u, U_MIN, U_MAX);
 
     // 8. LOGGING
-    flag = !flag;
-    if (flag){
+    if (flag++ >= 4){
+        flag = 0;
         // printf("> P:%.2f, Q:%.2f, U:%.2f\n",
-        //   presion,flow/10.0f,   u/10  ); 
+        //         presion,flow/10.0f,   u/10  ); 
         // printf("> P:%.2f, Q:%.2f, U:%.2f, Kp:%.1f, uff:%.2f, upp:%.2f, upi_calc:%.2f, upi:%.2f, upd:%.2f, ufd:%.2f\n",
-        //          (presion-tmp),flow/10.0f,u/10.0f,current_Kpp,uff,upp,      upi_calc,      upi,      upd,      ufd); 
+        //         (presion-tmp),flow/10.0f,u/10.0f,current_Kpp,uff,upp,      upi_calc,      upi,      upd,      ufd); 
         // printf("> P:%.2f, Q:%.2f, U:%.2f, uff:%.2f, upp:%.2f, upi:%.2f, upd:%.2f, ufd:%.2f\n",
         //         (presion-tmp),flow/10.0f,u/10.0f,uff,upp,     upi,      upd,      ufd); 
     }        
@@ -256,8 +256,8 @@ typedef enum {
     STATE_EXP = 2       // Fase Expiratoria / Espera de Trigger
 } CPAP_State;
 
-#define BRAKE_DURATION_TICKS 100  // 1000ms de frenado activo a 100Hz
-#define Q_DROP_PERCENTAGE 0.85f // Disparo al caer al 80% del pico
+#define BRAKE_DURATION_TICKS 200  // 1000ms de frenado activo a 100Hz
+#define Q_DROP_PERCENTAGE 0.90f // Disparo al caer al 80% del pico
 #define SLOPE_BRAKE_THRESHOLD -10.0f // Sensibilidad de la pendiente dQ/dt
 
 /*------------ Ganancias PID ------------*/
@@ -279,7 +279,8 @@ typedef enum {
 #define I_LIMIT_NEG     (PWM_MAX_INTEGRAL_NEG / Kpi)
 
 /*------------ Límites Actuador ------------*/
-#define U_MIN   1.0f 
+// #define U_MIN   1.0f 
+#define U_MIN   0.5f 
 #define U_MAX   100.0f
 
 
@@ -293,7 +294,7 @@ static inline float clamp(float x, float lo, float hi) {
     return (x < lo) ? lo : (x > hi) ? hi : x;
 }
 
-int16_t controller(uint8_t setpointPresion, float presion, float flow)
+int16_t controller(float setpointPresion, float presion, float flow)
 {
     static CPAP_State currentState = STATE_INSP;
     static float Q_peak = 0.0f;
@@ -317,7 +318,8 @@ int16_t controller(uint8_t setpointPresion, float presion, float flow)
             // Condición de Predicción: ¿Caída repentina de flujo?
             if (flow < (Q_DROP_PERCENTAGE * Q_peak) && dq < SLOPE_BRAKE_THRESHOLD) {
                 brakeCounter = 0;
-                sp_active = sp_nominal - 1.0f; 
+                integral = 0.0f;
+                //sp_active = sp_nominal - 1.0f; 
                 currentState = STATE_BRAKE;
                 // Reset de integral para evitar "windup" durante el pico de presión exhalatoria
                 // integral *= 0.2f; 
@@ -332,18 +334,26 @@ int16_t controller(uint8_t setpointPresion, float presion, float flow)
 
             // CONDICIÓN DE SALIDA: Presión cae por debajo de (sp_nominal - 0.5)
             // Se incluye un timeout de seguridad de 200ms (20 ticks)
-            if (presion < (sp_nominal - 0.05f) )//|| brakeCounter >= BRAKE_DURATION_TICKS) 
+            if (presion < (sp_nominal - 0.2f)  && (flow < Q_peak/2.0f))//|| brakeCounter >= BRAKE_DURATION_TICKS) 
             {
                 integral = 0.0f; //
-                sp_active = sp_nominal; // Restauramos setpoint nominal para la espiración
+                sp_active = sp_nominal + 1.5f; // Restauramos setpoint nominal para la espiración
                 currentState = STATE_EXP;
+            }
+            else if ((brakeCounter >= BRAKE_DURATION_TICKS) && (flow> Q_peak)) 
+            { 
+                Q_peak = 0.0f;
+                // Timeout de seguridad: Si el frenado se extiende demasiado, forzamos la transición
+                integral = 0.0f; // Reset de integral para evitar acumulación excesiva
+                currentState = STATE_INSP;
             }
             break;
 
         case STATE_EXP:
             // Trigger Inspiratorio: El paciente vuelve a demandar flujo
-            if (dq > 5.0f && flow > 15.0f) { // Umbrales de ejemplo
+            if (dq > 5.0f && flow > 15.0f) { 
                 Q_peak = 0.0f;
+                sp_active = sp_nominal;
                 currentState = STATE_INSP;
             }
             break;
@@ -378,14 +388,15 @@ int16_t controller(uint8_t setpointPresion, float presion, float flow)
     upi = Kpi * integral;    
 
     uqd = KdQ * dq;
-
-    if (currentState == STATE_BRAKE) {
-        uff *= 0.3f; // Reducción adicional durante el frenado activo
-        if (upd > 0.0f) upd *= -1.0f; // Atenuación del derivativo si va en dirección de aumentar presión
-        if (uqd > 0.0f) uqd *= -1.0f; // Evitar que la integral sume durante el frenado
-    }
     
     u = uff + upp + upi + upd + uqd;
+    
+    if (currentState == STATE_BRAKE) {
+        u *= 0.75f; // Durante el frenado activo, anulamos la salida para maximizar la caída de presión
+        // uff *= 0.3f; // Reducción adicional durante el frenado activo
+        // if (upd > 0.0f) upd *= -1.0f; // Atenuación del derivativo si va en dirección de aumentar presión
+        // if (uqd > 0.0f) uqd *= -1.0f; // Evitar que la integral sume durante el frenado
+    }
 
     u = clamp(u, U_MIN, U_MAX);
 
@@ -397,8 +408,8 @@ int16_t controller(uint8_t setpointPresion, float presion, float flow)
         //   presion,flow/10.0f,   u/10  ); 
         // printf("> P:%.2f, Q:%.2f, U:%.2f, Kp:%.1f, uff:%.2f, upp:%.2f, upi_calc:%.2f, upi:%.2f, upd:%.2f, ufd:%.2f\n",
         //          (presion-tmp),flow/10.0f,u/10.0f,current_Kpp,uff,upp,      upi_calc,      upi,      upd,      ufd); 
-        printf("> P:%.2f, Q:%.2f, U:%.2f, uff:%.2f, upp:%.2f, upi:%.2f, upd:%.2f, uqd:%.2f, dq:%.2f, Q_peak:%.2f, state:%u \n",
-                (presion-tmp),flow/10.0f,u/10.0f,uff,upp,     upi,      upd,      uqd,      dq,      Q_peak,      currentState); 
+        // printf("> P:%.2f, Q:%.2f, U:%.2f, uff:%.2f, upp:%.2f, upi:%.2f, upd:%.2f, uqd:%.2f, dq:%.2f, Q_peak:%.2f, state:%u \n",
+        //         (presion-tmp),flow/10.0f,u/10.0f,uff,upp,     upi,      upd,      uqd,      dq,      Q_peak,      currentState); 
     }        
     return (uint16_t)lrintf(u * 10.0f); 
 }

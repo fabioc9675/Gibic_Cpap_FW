@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include "math.h"
 #include "driver/gpio.h"
+#include "common/common.h"
 
 void controlarHumidificador(float setpoint,float Vntc);
 void inicializarHumidificador(void);

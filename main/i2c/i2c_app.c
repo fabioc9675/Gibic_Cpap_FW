@@ -112,20 +112,29 @@ void i2c_app(void *pvParameters)
     } else {
         ESP_LOGE("ADC", "Error: No se recibió interrupción");
     }
+    //force a seccond read
+    (void)i2c_adc1015_get_ch(3, ADS1015_MODE_SINGLE_SHOT);
+    if (xSemaphoreTake(adc_ready_sem, pdMS_TO_TICKS(20)) == pdTRUE) {
+        ret = i2c_adc1015_read_ch(&adc); 
+    } else {
+        ESP_LOGE("ADC", "Error: Not received interrupt");
+    }  
     offsetPresion = get_pressure(adc, 0); 
-    ESP_LOGI("I2C_APP", "offset presion: %0.2f", offsetPresion);
+    // ESP_LOGI("I2C_APP", "offset presion: %0.2f", offsetPresion);
 
-    uint64_t timenow = esp_timer_get_time();
-    while (timenow + 3000 > esp_timer_get_time());
+    vTaskDelay(pdMS_TO_TICKS(10));
+
+    // uint64_t timenow = esp_timer_get_time();
+    // while (timenow + 3000 > esp_timer_get_time());
 
     //leemos offset flujo
     ret = ESP_FAIL;
     while(ESP_OK != ret){
         ret = xSdp810_ReadMeasurementResults(&sdppresiondiff, &sdptemperatura);
-        printf("error read sdp810 %d \n", ret);
+        // printf("error read sdp810 %d \n", ret);
     }
     offsetFlujo = get_flow (sdppresiondiff, 0);
-    ESP_LOGI("I2C_APP", "offset flujo: %0.2f", offsetFlujo);
+    // ESP_LOGI("I2C_APP", "offset flujo: %0.2f", offsetFlujo);
     
     for(;;) 
     {
@@ -173,12 +182,22 @@ void i2c_app(void *pvParameters)
             case st_rAdc0: //read temp
                 if (xSemaphoreTake(adc_ready_sem, pdMS_TO_TICKS(20)) == pdTRUE) {
                     ret = i2c_adc1015_read_ch(&adc); 
+                } else {
+                    ESP_LOGE("ADC", "Error: Not received interrupt");
+                    i2c_state = st_init; 
+                }
+                
+                //force a seccond read
+                (void)i2c_adc1015_get_ch(1, ADS1015_MODE_SINGLE_SHOT);
+                if (xSemaphoreTake(adc_ready_sem, pdMS_TO_TICKS(20)) == pdTRUE) {
+                    ret = i2c_adc1015_read_ch(&adc); 
                     datos.temphumV = adc / 1000.0f; //convert to V
                     i2c_state = st_iddle;
                 } else {
                     ESP_LOGE("ADC", "Error: Not received interrupt");
                     i2c_state = st_init; 
                 }
+
                 // enable continous read for next cycle
                 (void)i2c_adc1015_get_ch(3, ADS1015_MODE_CONTINUOUS);
                 // i2c_state = st_iddle;

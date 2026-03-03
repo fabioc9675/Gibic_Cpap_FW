@@ -57,6 +57,8 @@ esp_err_t i2c_adc1015_get_ch(uint8_t ch, uint8_t mode)
     adctemp[0] = 0x01;
     // set chanel and rate
     adctemp[1] =(uint8_t)((--ch+4) << 4)|0x03;
+    // print esta configuración para debug
+    // ESP_LOGI(TAG, "ADC1015 config: %02x,%02X", adctemp[0],adctemp[1]);
     // set sample rate 3300SPS 
     adctemp[2] = 0xE0;
 

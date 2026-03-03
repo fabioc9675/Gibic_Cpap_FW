@@ -26,6 +26,6 @@
  * param: presion: presion actual del sistema
  * return: salida del control PID
  */
-int16_t controller(uint8_t setpointPresion, float presion, float flow);
+int16_t controller(float setpointPresion, float presion, float flow);
 
 #endif // CONTROL_H

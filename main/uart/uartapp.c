@@ -43,10 +43,9 @@ void uart_app(void *pvParameters)
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT,
     };
-    // Install UART driver, and get the queue.
     
+    // Install UART driver, and get the queue.
     uart_driver_install(uart_num, BUF_SIZE * 2, BUF_SIZE * 2, 10, &uart1_queue, 0);
-
     ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
 
     // set pins for uart
@@ -59,12 +58,14 @@ void uart_app(void *pvParameters)
     brillo = 50;
     presion = 4;
     tiempo = 15;
-    humedad = 4;
+    humedad = 0;
     
     changeToPage(50); // Cambia a la pagina 0
     //writeDWIN(PRESION_REG, 4);
-    writeDWIN(PRESION_ACT,4); // Valor inicial de presion objetivo
-    //initScreen();
+    // writeDWIN(PRESION_REG,presion); // Valor inicial de presion objetivo
+    // writeDWIN(HUMEDAD_REG,humedad); // Valor inicial de humedad objetivo
+    // writeDWIN
+    initScreen();
     
     for (;;)
     {
@@ -163,6 +164,8 @@ bool checkSequence()
             break;
         case HUMEDAD_REG:
             humedad = value;
+            datos.command = 'H';
+            datos.value = humedad;
             break;
         case FUGAS_REG:
             fugas = value;

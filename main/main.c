@@ -2,6 +2,7 @@
 #include <string.h>
 #include <sys/unistd.h>
 #include <sys/stat.h>
+#include "esp_app_trace.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -17,6 +18,7 @@
 #include "control/lut.h"
 #include "control/humidificador.h"
 #include "proc/fResp.h"
+#include "ds18b20/ds18b20app.h"
 
 #include "wifi/wifiserver.h"
 
@@ -62,6 +64,15 @@ void task_monitor(void *pvParameters) {
     }
 }
 
+void purgeQueue(QueueHandle_t queue) {
+    if (queue != NULL) {
+        void *tempBuffer = NULL; // Buffer temporal para recibir los mensajes
+        while (uxQueueMessagesWaiting(queue) > 0) {
+            xQueueReceive(queue, &tempBuffer, 0); // Recibe y descarta los mensajes
+        }
+    }
+}
+
 /**
  * task handlers
  */
@@ -69,13 +80,14 @@ TaskHandle_t thUartApp = NULL;
 TaskHandle_t thSdApp = NULL;
 TaskHandle_t thI2CApp = NULL;
 TaskHandle_t thBldcApp = NULL;
+TaskHandle_t thds18b20app = NULL;
 
 /**
  * flags and variables for the system
  */
 uint8_t setPointPresion = 4;
+uint8_t sPHum = 0;
 int16_t bldc_sp = 1;
-uint8_t spbldctemp = 0;
 uint8_t t_log = 0;
 
 /*
@@ -122,14 +134,15 @@ void app_main(void)
     init_sdmmc();
     I2C1_init();
     init_lut_p();
+    init_lut_h();
     
     /**
      * LCD comunicatins queeue and task
      */
     uart_app_queue = xQueueCreate(10, sizeof(struct uartDataIn));
     uart_app_queue_rx = xQueueCreate(10, sizeof(struct ToUartData ));
-    //          xTaskCreate(uart_app, "uart_app", 4096, NULL, 10, &thUartApp);
     xTaskCreatePinnedToCore(uart_app, "uart_app", 4096, NULL, 1, &thUartApp, APP_CPU_NUM);
+    xTaskCreatePinnedToCore(ds18b20app, "ds18b20_app", 4096, NULL, 1, &thds18b20app, APP_CPU_NUM);
 
     // * Algorithm variables and buffers initialization */
     //filter_t *fl_press = filter_create(3);
@@ -147,9 +160,15 @@ void app_main(void)
             struct uartDataIn datos;
             
             xQueueReceive(uart_app_queue, &datos, 0);
-            ESP_LOGI("LCD", "RAW, c: %d, v: %d", datos.command, datos.value);
+            // ESP_LOGI("LCD", "RAW, c: %d, v: %d", datos.command, datos.value);
             switch (datos.command)
             {
+            case 'H': //humedad objetivo
+
+                 sPHum = lookup_table_get(&lut_h,datos.value);
+                // setPointPresion = datos.value; lut_h
+                break;
+
             case 'P': //presion objetivo
                 setPointPresion = datos.value;
                 break;
@@ -159,7 +178,7 @@ void app_main(void)
 
                     if (setPointPresion &&  msEstados == idle){
                         msEstados = initfilesd;
-                        spbldctemp = setPointPresion;
+                        // printf("setPointPresion: %d, setPointHunedad: %d\n", setPointPresion, sPHum);
                     }
                     
                 }else if(datos.value==0){
@@ -210,6 +229,7 @@ void app_main(void)
                 bldc_App_queue = xQueueCreate(10, sizeof(int16_t));
                 // xTaskCreate(bldc_servo_app, "bldc_servo_app", 4096, NULL, 10, &thBldcApp);
                 xTaskCreatePinnedToCore(bldc_servo_app, "bldc_servo_app", 4096, NULL, 1, &thBldcApp, PRO_CPU_NUM);
+                
                 msEstados = initCpap;
 
                 /**
@@ -219,6 +239,7 @@ void app_main(void)
                 touartdata.command = UPresion;
                 touartdata.value = (int8_t)setPointPresion;
                 xQueueSend(uart_app_queue_rx, &touartdata,0);
+             
                 inicializarHumidificador();
 
                 break;
@@ -227,8 +248,7 @@ void app_main(void)
                 
                 struct Datos_usd datos_usd;
                 struct Datos_I2c datos_i2c;
-                
-                if (xQueueReceive(i2c_App_queue, &datos_i2c, portMAX_DELAY) == pdPASS)
+                if (xQueueReceive(i2c_App_queue, &datos_i2c, pdMS_TO_TICKS(1000)) == pdPASS)
                 { 
                     // t_start = esp_timer_get_time();
                     /**
@@ -274,7 +294,7 @@ void app_main(void)
                     datos_usd.presionfl -= lookup_table_get(&lut_p,setPointPresion);
                     datos_usd.timestamp = datos_i2c.timestamp;
                     // processed_signal(datos_usd.flujofl, &datos_usd.t_smp, &datos_usd.t_cp);
-                    controlarHumidificador(45.0, datos_i2c.temphumV);
+                    controlarHumidificador(sPHum, datos_i2c.temphumV);
                     if (t_log++ >= FS/FS_LOG){
                         t_log = 0;
                         xQueueSend(sd_App_queue, &datos_usd, pdMS_TO_TICKS(20));
@@ -299,6 +319,9 @@ void app_main(void)
                 killTask(&thSdApp);
                 killTask(&thI2CApp);
                 killTask(&thBldcApp);
+                purgeQueue(i2c_App_queue);
+                purgeQueue(bldc_App_queue);
+                purgeQueue(sd_App_queue);
                 vQueueDelete(i2c_App_queue);
                 vQueueDelete(bldc_App_queue);
                 vQueueDelete(sd_App_queue);
