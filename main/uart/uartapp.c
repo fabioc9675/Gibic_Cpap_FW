@@ -58,7 +58,7 @@ void uart_app(void *pvParameters)
     brillo = 50;
     presion = 4;
     tiempo = 15;
-    humedad = 0;
+    humedad = 4;
     
     changeToPage(50); // Cambia a la pagina 0
     //writeDWIN(PRESION_REG, 4);

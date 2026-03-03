@@ -50,10 +50,10 @@ void ds18b20app(void *pvParameters)
             // check if the device is a DS18B20, if so, return the ds18b20 handle
             if (ds18b20_new_device_from_enumeration(&next_onewire_device, &ds_cfg, &ds18b20s[ds18b20_device_num]) == ESP_OK) {
                 ds18b20_get_device_address(ds18b20s[ds18b20_device_num], &address);
-                ESP_LOGI(TAG, "Found a DS18B20[%d], address: %016llX", ds18b20_device_num, address);
+                // ESP_LOGI(TAG, "Found a DS18B20[%d], address: %016llX", ds18b20_device_num, address);
                 ds18b20_device_num++;
                 if (ds18b20_device_num >= EXAMPLE_ONEWIRE_MAX_DS18B20) {
-                    ESP_LOGI(TAG, "Max DS18B20 number reached, stop searching...");
+                    // ESP_LOGI(TAG, "Max DS18B20 number reached, stop searching...");
                     break;
                 }
             } else {

@@ -8,6 +8,7 @@
 #include "math.h"
 #include "driver/gpio.h"
 #include "common/common.h"
+#include "../ds18b20/ds18b20app.h"
 
 void controlarHumidificador(float setpoint,float Vntc);
 void inicializarHumidificador(void);

@@ -86,7 +86,7 @@ TaskHandle_t thds18b20app = NULL;
  * flags and variables for the system
  */
 uint8_t setPointPresion = 4;
-uint8_t sPHum = 0;
+uint8_t sPHum = 40;//0;
 int16_t bldc_sp = 1;
 uint8_t t_log = 0;
 

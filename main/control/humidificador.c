@@ -134,7 +134,7 @@ void controlarHumidificador(float setpoint,float Vntc) {
         muestraCount = 0;
         float Vprom = acumTemp / N_MUESTRAS;
         float T = temperaturaDesdeVoltaje(Vprom); 
-        // printf("temperatura humidificador: %.2f C \t Voltaje: %.2f \t SP:%0.2f\n", T, Vprom, setpoint);
+        // printf("tempDS: %.2f \t tempH: %.2f \t V: %.2f \t SP:%.2f\n", temperature, T, Vprom, setpoint);
         acumTemp = 0.0;
         actualizarControl(T, setpoint);
     }

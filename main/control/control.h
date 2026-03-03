@@ -16,7 +16,7 @@
 #include "common/common.h"
 
 //#define control1 control2 control3
-#define control3
+#define control2
 
 
 

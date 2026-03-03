@@ -283,10 +283,15 @@ typedef enum {
 #define U_MIN   0.5f 
 #define U_MAX   100.0f
 
+/*------------ FILTROS DE RUIDO ------------*/
+#define D_FILTER_ALPHA  0.94f 
+#define Q_FILTER_ALPHA  0.94f  
 
 // Variables estáticas para los filtros
 static float last_pressure = 0.0f; 
 static float last_flow = 0.0f;
+static float dp_filtered = 0.0f; 
+static float dq_filtered = 0.0f;
 
 uint8_t flag = 0;
 
@@ -307,8 +312,10 @@ int16_t controller(float setpointPresion, float presion, float flow)
     float sp_active = sp_nominal;                   // Referencia real para el PID
 
     // 1. CÁLCULO DE DERIVADA
-    float dq = (flow - last_flow) / DT;
+    float dq_raw = (flow - last_flow) / DT;
     last_flow = flow;
+    dq_filtered = (Q_FILTER_ALPHA * dq_filtered) + ((1.0f - Q_FILTER_ALPHA) * dq_raw);
+    float uqd = KdQ * dq_filtered;
 
     // 2. LÓGICA DE TRANSICIÓN DE LA FSM
     switch (currentState) {
@@ -316,7 +323,7 @@ int16_t controller(float setpointPresion, float presion, float flow)
             if (flow > Q_peak) Q_peak = flow; // Seguimiento del pico
 
             // Condición de Predicción: ¿Caída repentina de flujo?
-            if (flow < (Q_DROP_PERCENTAGE * Q_peak) && dq < SLOPE_BRAKE_THRESHOLD) {
+            if (flow < (Q_DROP_PERCENTAGE * Q_peak) && dq_filtered < SLOPE_BRAKE_THRESHOLD) {
                 brakeCounter = 0;
                 integral = 0.0f;
                 //sp_active = sp_nominal - 1.0f; 
@@ -351,7 +358,7 @@ int16_t controller(float setpointPresion, float presion, float flow)
 
         case STATE_EXP:
             // Trigger Inspiratorio: El paciente vuelve a demandar flujo
-            if (dq > 5.0f && flow > 15.0f) { 
+            if (dq_filtered > 5.0f && flow > 15.0f) { 
                 Q_peak = 0.0f;
                 sp_active = sp_nominal;
                 currentState = STATE_INSP;
@@ -367,17 +374,40 @@ int16_t controller(float setpointPresion, float presion, float flow)
     float upp = 0.0f;
     float upi = 0.0f;
     float upd = 0.0f;
-    float uqd = 0.0f;
+
 
     float ep = (sp_active - presion);
 
     // Proporcional
     upp = Kpp * ep;
 
+
+
+//     /*------------ FILTROS DE RUIDO ------------*/
+// #define D_FILTER_ALPHA  0.94f 
+// #define Q_FILTER_ALPHA  0.94f  
+
+// // Variables estáticas para los filtros
+// static float last_pressure = 0.0f; 
+// static float last_flow = 0.0f;
+
+    // // 5. DERIVATIVO DE PRESIÓN 
+    // float dp_raw = (presion - last_pressure) / DT;
+    // dp_filtered = (D_FILTER_ALPHA * dp_filtered) + ((1.0f - D_FILTER_ALPHA) * dp_raw);
+    // float upd;
+    // if(fabsf(ep)<DEADZONE_PRESSURE){
+    //     upd = 0.0f;
+    // } else {
+    //     upd = -Kpd * dp_filtered;
+    // }
+    // last_pressure = presion; 
+
+
     // Derivativo de Presión
-    float dp = (presion - last_pressure) / DT;
+    float dp_raw = (presion - last_pressure) / DT;
+    dp_filtered = (D_FILTER_ALPHA * dp_filtered) + ((1.0f - D_FILTER_ALPHA) * dp_raw);
     last_pressure = presion;
-    upd = (fabsf(ep) < DEADZONE_PRESSURE) ? 0.0f : -Kpd * dp;
+    upd = (fabsf(ep) < DEADZONE_PRESSURE) ? 0.0f : -Kpd * dp_filtered;
 
     // Integral con Anti-windup
     if (!((uff + upp + upd + (Kpi * integral) >= U_MAX && ep > 0) || 
@@ -387,17 +417,15 @@ int16_t controller(float setpointPresion, float presion, float flow)
     integral = clamp(integral, I_LIMIT_NEG, I_LIMIT_POS);
     upi = Kpi * integral;    
 
-    uqd = KdQ * dq;
-    
-    u = uff + upp + upi + upd + uqd;
-    
     if (currentState == STATE_BRAKE) {
-        u *= 0.75f; // Durante el frenado activo, anulamos la salida para maximizar la caída de presión
+        uff *= 0.75f; // Durante el frenado activo, anulamos la salida para maximizar la caída de presión
         // uff *= 0.3f; // Reducción adicional durante el frenado activo
-        // if (upd > 0.0f) upd *= -1.0f; // Atenuación del derivativo si va en dirección de aumentar presión
-        // if (uqd > 0.0f) uqd *= -1.0f; // Evitar que la integral sume durante el frenado
+        if (upd > 0.0f) upd *= -1.0f; // Atenuación del derivativo si va en dirección de aumentar presión
+        if (uqd > 0.0f) uqd *= -1.0f; // Evitar que la integral sume durante el frenado
     }
 
+    // accion total
+    u = uff + upp + upi + upd + uqd;
     u = clamp(u, U_MIN, U_MAX);
 
     // 8. LOGGING
@@ -409,7 +437,7 @@ int16_t controller(float setpointPresion, float presion, float flow)
         // printf("> P:%.2f, Q:%.2f, U:%.2f, Kp:%.1f, uff:%.2f, upp:%.2f, upi_calc:%.2f, upi:%.2f, upd:%.2f, ufd:%.2f\n",
         //          (presion-tmp),flow/10.0f,u/10.0f,current_Kpp,uff,upp,      upi_calc,      upi,      upd,      ufd); 
         // printf("> P:%.2f, Q:%.2f, U:%.2f, uff:%.2f, upp:%.2f, upi:%.2f, upd:%.2f, uqd:%.2f, dq:%.2f, Q_peak:%.2f, state:%u \n",
-        //         (presion-tmp),flow/10.0f,u/10.0f,uff,upp,     upi,      upd,      uqd,      dq,      Q_peak,      currentState); 
+                // (presion-tmp),flow/10.0f,u/10.0f,uff,upp,     upi,      upd,      uqd,      dq_filtered,      Q_peak,      currentState); 
     }        
     return (uint16_t)lrintf(u * 10.0f); 
 }
