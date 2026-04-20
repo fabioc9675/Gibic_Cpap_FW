@@ -141,8 +141,12 @@ void app_main(void)
      */
     uart_app_queue = xQueueCreate(10, sizeof(struct uartDataIn));
     uart_app_queue_rx = xQueueCreate(10, sizeof(struct ToUartData ));
+    bldc_App_queue = xQueueCreate(10, sizeof(int16_t));
+    i2c_App_queue = xQueueCreate(10, sizeof(struct Datos_I2c));
     xTaskCreatePinnedToCore(uart_app, "uart_app", 4096, NULL, 1, &thUartApp, APP_CPU_NUM);
     xTaskCreatePinnedToCore(ds18b20app, "ds18b20_app", 4096, NULL, 1, &thds18b20app, APP_CPU_NUM);
+    xTaskCreatePinnedToCore(bldc_servo_app, "bldc_servo_app", 4096, NULL, 1, &thBldcApp, PRO_CPU_NUM);
+    xTaskCreatePinnedToCore(i2c_app, "i2c_app", 4096, NULL, 2, &thI2CApp, PRO_CPU_NUM);
 
     // * Algorithm variables and buffers initialization */
     //filter_t *fl_press = filter_create(3);
@@ -217,8 +221,8 @@ void app_main(void)
             
             case initSensors:
                 //init queue and task i2c
-                i2c_App_queue = xQueueCreate(10, sizeof(struct Datos_I2c));
-                xTaskCreatePinnedToCore(i2c_app, "i2c_app", 4096, NULL, 2, &thI2CApp, PRO_CPU_NUM);
+                // i2c_App_queue = xQueueCreate(10, sizeof(struct Datos_I2c));
+                // xTaskCreatePinnedToCore(i2c_app, "i2c_app", 4096, NULL, 2, &thI2CApp, PRO_CPU_NUM);
                 msEstados = initbldc;
                 // init humidificador
                 inicializarHumidificador();
@@ -226,9 +230,9 @@ void app_main(void)
                 
             case initbldc:
                 //init queue and task bldc
-                bldc_App_queue = xQueueCreate(10, sizeof(int16_t));
+                // bldc_App_queue = xQueueCreate(10, sizeof(int16_t));
                 // xTaskCreate(bldc_servo_app, "bldc_servo_app", 4096, NULL, 10, &thBldcApp);
-                xTaskCreatePinnedToCore(bldc_servo_app, "bldc_servo_app", 4096, NULL, 1, &thBldcApp, PRO_CPU_NUM);
+                // xTaskCreatePinnedToCore(bldc_servo_app, "bldc_servo_app", 4096, NULL, 1, &thBldcApp, PRO_CPU_NUM);
                 
                 msEstados = initCpap;
 
@@ -317,13 +321,13 @@ void app_main(void)
                 //terminar procesos
                 closefile();
                 killTask(&thSdApp);
-                killTask(&thI2CApp);
-                killTask(&thBldcApp);
+                // killTask(&thI2CApp);
+                // killTask(&thBldcApp);
                 purgeQueue(i2c_App_queue);
                 purgeQueue(bldc_App_queue);
                 purgeQueue(sd_App_queue);
-                vQueueDelete(i2c_App_queue);
-                vQueueDelete(bldc_App_queue);
+                // vQueueDelete(i2c_App_queue);
+                // vQueueDelete(bldc_App_queue);
                 vQueueDelete(sd_App_queue);
                 msEstados = idle;
                 break;
